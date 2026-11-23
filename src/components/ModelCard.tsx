@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { ModelCard as Card } from "@/lib/makerworld.ts";
 import { compact, mwImage, mwSrcSet } from "@/lib/format";
+import { t } from "@/lib/i18n";
 import { DownloadIcon, HeartIcon } from "./Icons";
 import { FavoriteIcon } from "./FavoriteButton";
 
@@ -44,11 +45,11 @@ function ModelCardLink({ model, priority }: { model: Card; priority: boolean }) 
             <span>{model.creator.name}</span>
           </span>
           <span className="stats">
-            <span title="Downloads">
+            <span title={t("model.downloads")}>
               <DownloadIcon size={13} />
               {compact(model.downloads)}
             </span>
-            <span title="Likes">
+            <span title={t("model.likes")}>
               <HeartIcon size={13} />
               {compact(model.likes)}
             </span>

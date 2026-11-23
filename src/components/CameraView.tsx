@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { CameraIcon } from "./Icons";
+import { t } from "@/lib/i18n";
 
 /**
  * Live view of the U1 camera. The stock firmware only offers a JPEG that it rewrites about 3.5 times
@@ -52,11 +53,11 @@ export function CameraView({ online }: { online: boolean }) {
     <div className="camera">
       {online && frame && !paused ? (
         // eslint-disable-next-line @next/next/no-img-element
-        <img src={frame} alt="Live camera view of the print bed" />
+        <img src={frame} alt={t("camera.liveAlt")} />
       ) : (
         <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 10 }}>
           <CameraIcon size={44} />
-          <span className="small">{!online ? "Camera offline" : paused ? "Camera paused" : stale ? "Camera unavailable" : "Waking the camera…"}</span>
+          <span className="small">{!online ? t("camera.offline") : paused ? t("camera.paused") : stale ? t("camera.unavailable") : t("camera.waking")}</span>
         </div>
       )}
       {online && (
@@ -65,10 +66,10 @@ export function CameraView({ online }: { online: boolean }) {
             className="badge"
             style={{ background: stale ? "#6B7280" : paused ? "#374151" : "#C62D2D", color: "#fff", fontSize: 12 }}
           >
-            {stale ? "NO SIGNAL" : paused ? "PAUSED" : "LIVE"}
+            {stale ? t("camera.noSignal") : paused ? t("camera.paused") : t("camera.live")}
           </span>
           <button type="button" className="btn btn-sm" onClick={() => setPaused(!paused)} style={{ background: "rgba(255,255,255,.9)" }}>
-            {paused ? "Resume camera" : "Pause camera"}
+            {paused ? t("camera.resume") : t("camera.pause")}
           </button>
         </div>
       )}

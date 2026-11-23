@@ -9,6 +9,7 @@ import type { MeshData } from "@/lib/previewMesh";
 import type { NewPlateEntry } from "@/lib/usePlate";
 import type { Orient } from "@/lib/orient";
 import { api, duration, euros, inkFor, matchColors, printPrice, slicedPrice } from "@/lib/format";
+import { t } from "@/lib/i18n";
 import { footprint, U1_BED } from "@/lib/packing";
 import { usePlate } from "@/lib/usePlate";
 import { useSupportsOption } from "@/lib/useCreatorSupports";
@@ -80,9 +81,9 @@ type Props = {
 };
 
 const LEVEL_BADGE: Record<CheckLevel, [string, string]> = {
-  ok: ["green", "OK"],
-  warn: ["orange", "Check"],
-  error: ["red", "Problem"],
+  ok: ["green", t("print.ok")],
+  warn: ["orange", t("print.check")],
+  error: ["red", t("print.problem")],
 };
 
 export function shortPreset(p: string) {
@@ -129,7 +130,7 @@ export function PrintSetup(props: Props) {
     const colored = slots.filter((s) => s.color);
     const picks = matchColors(
       colored.map((s) => s.color!),
-      settings.tools.map((t) => t.color),
+      settings.tools.map((tool) => tool.color),
     );
     return Object.fromEntries(colored.map((s, k) => [s.slot, picks[k]])) as Record<number, number>;
   }, [slots, settings.tools]);
@@ -204,7 +205,7 @@ export function PrintSetup(props: Props) {
       ? await plateList.addMany(plates.map((p) => props.plateEntry(setup(p.index, p.index === plate))))
       : await plateList.add(props.plateEntry(setup(plate, true)));
     setPlateState(ok ? "added" : "idle");
-    if (!ok) setError("Could not add the model to the plate.");
+    if (!ok) setError(t("print.addError"));
   };
 
   const busy = job?.status === "running";
@@ -226,7 +227,7 @@ export function PrintSetup(props: Props) {
           {props.header}
           {checks.length > 0 && (
             <>
-              <h2 style={{ marginTop: 4 }}>Checks</h2>
+              <h2 style={{ marginTop: 4 }}>{t("print.checks")}</h2>
               <ul className="check-list">
                 {checks.map((c) => (
                   <li key={c.title}>
@@ -250,7 +251,7 @@ export function PrintSetup(props: Props) {
           {plates.length > 1 && (
             <div className="field">
               <label className="label" htmlFor="print-plate">
-                Plate to print
+                {t("print.plateToPrint")}
               </label>
               <select id="print-plate" className="select" value={plate} onChange={(e) => onPlate(Number(e.target.value))}>
                 {plates.map((p) => (
@@ -272,45 +273,44 @@ export function PrintSetup(props: Props) {
             )}
             {estimate?.grams != null && (
               <div>
-                <span>Filament</span>
+                <span>{t("print.filament")}</span>
                 <span>{Math.round(estimate.grams)} g</span>
               </div>
             )}
             <div>
-              <span>Toolheads</span>
-              <span>{toolsUsed.size} of 4</span>
+                <span>{t("print.toolheads")}</span>
+              <span>{toolsUsed.size} / {t("print.ofFour")}</span>
             </div>
             {estimatedPrice != null && (
               <div>
-                <span>Price</span>
+                <span>{t("print.price")}</span>
                 <span>{euros(estimatedPrice)}</span>
               </div>
             )}
           </div>
-          <p className="small muted">The exact U1 time, weight and price appear after slicing. Prices per kilo are set with each toolhead in Settings.</p>
+          <p className="small muted">{t("print.estimateHint")}</p>
 
-          <h2 style={{ marginTop: 4 }}>{slots.some((s) => s.color) ? "Colors → toolheads" : "Toolhead"}</h2>
+          <h2 style={{ marginTop: 4 }}>{slots.some((s) => s.color) ? t("print.colorsToToolheads") : t("print.toolhead")}</h2>
           <p className="small muted">
             {slots.some((s) => s.color)
-              ? "Each model color is printed by one of your four toolheads. They are matched by closest color; change any of them."
-              : "An STL has one color. Pick the toolhead that prints it."}{" "}
-            Edit what is loaded in <Link href="/settings">Settings</Link>.
+              ? t("print.colorsDescription")
+              : t("print.stlDescription")} {t("print.editSettings")}
           </p>
           <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
             {slots.map((s) => (
               <ToolSelect
                 key={s.slot}
                 id={`slot-${s.slot}`}
-                label={s.color ? `Color ${s.slot}${s.type ? ` · ${s.type}` : ""}` : "Toolhead"}
+                label={s.color ? `${t("print.colorSlot", { n: s.slot })}${s.type ? ` · ${s.type}` : ""}` : t("print.toolhead")}
                 detail={s.grams ? `${Math.round(s.grams)} g` : undefined}
                 swatch={s.color}
                 value={toolFor(s.slot)}
                 tools={settings.tools}
-                onChange={(t) => setOverrides({ ...overrides, [s.slot]: t })}
+                onChange={(tool) => setOverrides({ ...overrides, [s.slot]: tool })}
               />
             ))}
           </div>
-          {slots.length > 4 && <div className="notice">This model uses {slots.length} colors. The U1 has 4 toolheads, so some colors will share a toolhead.</div>}
+          {slots.length > 4 && <div className="notice">{t("print.tooManyColors", { n: slots.length })}</div>}
         </section>
 
         <SizePanel
@@ -332,35 +332,36 @@ export function PrintSetup(props: Props) {
         <section className="panel" style={{ order: 7 }}>
           {props.notice}
           <button type="button" className="btn btn-primary btn-lg" disabled={blocked || !settings.printerConfigured} onClick={() => start(true)}>
-            <SendIcon size={20} /> Slice for U1 &amp; print
+            <SendIcon size={20} /> {t("print.sliceAndPrint")}
           </button>
           {props.canSlice && !settings.printerConfigured && (
             <p className="small muted">
-              To print directly, add your printer address in <Link href="/settings">Settings</Link>. You can still slice and download.
+              {t("print.printerHint")}
+              <Link href="/settings">{t("settings.title")}</Link>。
             </p>
           )}
           <div style={{ display: "grid", gridTemplateColumns: props.extraActions ? "repeat(2, minmax(0, 1fr))" : "1fr", gap: 8 }}>
             <button type="button" className="btn" disabled={blocked} onClick={() => start(false)}>
-              Slice only
+              {t("print.sliceOnly")}
             </button>
             {props.extraActions}
           </div>
           <div style={{ display: "grid", gridTemplateColumns: plates.length > 1 ? "repeat(2, minmax(0, 1fr))" : "1fr", gap: 8 }}>
             <button type="button" className="btn" onClick={() => addToPlate(false)} disabled={plateState === "adding"}>
-              <PlateIcon size={16} /> {plateState === "added" ? "Added · add another" : plates.length > 1 ? `Add plate ${plate}` : "Add to plate"}
+              <PlateIcon size={16} /> {plateState === "added" ? t("print.addedAnother") : plates.length > 1 ? t("print.addPlate", { n: plate }) : t("print.addToPlate")}
             </button>
             {plates.length > 1 && (
               <button type="button" className="btn" onClick={() => addToPlate(true)} disabled={plateState === "adding"}>
-                <PlateIcon size={16} /> Add all {plates.length} plates
+                <PlateIcon size={16} /> {t("print.addAllPlates", { n: plates.length })}
               </button>
             )}
           </div>
           {plateState === "added" && (
             <p className="small" style={{ margin: 0 }}>
-              On the plate with your other picks. <Link href="/plate">Open the plate ({plateList.entries.length})</Link>
+              {t("print.addedHint")} <Link href="/plate">{t("print.openPlate", { n: plateList.entries.length })}</Link>
             </p>
           )}
-          {tooBig && <div className="notice error">At {size}% the model does not fit the U1. Make it smaller in Size &amp; preview.</div>}
+          {tooBig && <div className="notice error">{t("print.tooBig", { n: size })}</div>}
           {error && <div className="notice error">{error}</div>}
           {job && <JobProgress job={job} onSend={sendExisting} printerConfigured={settings.printerConfigured} tools={settings.tools} />}
         </section>
@@ -373,15 +374,15 @@ export function PrintSetup(props: Props) {
 export function PresetPicker({ modes, value, onChange }: { modes: Mode[]; value: string; onChange: (key: string) => void }) {
   return (
     <>
-      <h2>U1 preset</h2>
-      <div className="seg" role="radiogroup" aria-label="U1 preset">
+      <h2>{t("print.preset")}</h2>
+      <div className="seg" role="radiogroup" aria-label={t("print.preset")}>
         {modes.map((m) => (
           <button key={m.key} type="button" role="radio" aria-checked={value === m.key} onClick={() => onChange(m.key)}>
-            {m.label}
+            {t(`print.mode.${m.key}`)}
           </button>
         ))}
       </div>
-      <p className="small muted">{modes.find((m) => m.key === value)?.description}</p>
+      <p className="small muted">{t(`print.modeDescription.${value}`)}</p>
     </>
   );
 }
@@ -417,12 +418,12 @@ function ToolSelect({
         </>
       )}
       <label className="sr-only" htmlFor={id}>
-        {swatch ? `Toolhead for ${label}` : label}
+        {swatch ? `${t("print.toolheadFor")} ${label}` : label}
       </label>
       <select id={id} className="select" style={{ flex: swatch ? undefined : 1, borderColor: color }} value={value} onChange={(e) => onChange(Number(e.target.value))}>
-        {tools.map((t, i) => (
+        {tools.map((tool, i) => (
           <option key={i} value={i}>
-            T{i + 1} · {shortPreset(t.preset)}
+            T{i + 1} · {shortPreset(tool.preset)}
           </option>
         ))}
       </select>
@@ -449,7 +450,7 @@ export function JobProgress({ job, onSend, printerConfigured, tools }: { job: Jo
             <span className={`dot ${s.state}`}>{s.state === "done" ? "✓" : s.state === "error" ? "!" : i + 1}</span>
             <span style={{ flex: 1, color: s.state === "pending" || s.state === "skipped" ? "var(--faint)" : "var(--text)" }}>{s.label}</span>
             <span className="small muted" style={{ maxWidth: "45%", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={s.detail}>
-              {s.state === "skipped" ? "skipped" : s.detail}
+        {s.state === "skipped" ? t("print.skipped") : s.detail}
             </span>
           </li>
         ))}
@@ -460,7 +461,7 @@ export function JobProgress({ job, onSend, printerConfigured, tools }: { job: Jo
           {needsLogin && (
             <>
               {" "}
-              <Link href="/settings">Go to Settings</Link>.
+              <Link href="/settings">{t("print.goSettings")}</Link>。
             </>
           )}
         </div>
@@ -468,19 +469,19 @@ export function JobProgress({ job, onSend, printerConfigured, tools }: { job: Jo
       {sliced && (
         <div className="estimates">
           <div>
-            <span>{perPlate ? `Total, ${job.plates!.length} plates` : "U1 print time"}</span>
+            <span>{perPlate ? t("print.totalPlates", { n: job.plates!.length }) : t("print.printTime")}</span>
             <span>{duration(job.stats.seconds)}</span>
           </div>
           <div>
-            <span>Filament</span>
+            <span>{t("print.filament")}</span>
             <span>{job.stats.grams != null ? `${job.stats.grams.toFixed(1)} g` : "—"}</span>
           </div>
           <div>
-            <span>Tool changes</span>
+            <span>{t("print.toolChanges")}</span>
             <span>{job.stats.toolChanges ?? "—"}</span>
           </div>
           <div>
-            <span>Price</span>
+            <span>{t("print.price")}</span>
             <span>{euros(slicedPrice(job.stats, job.filamentToTool, tools))}</span>
           </div>
         </div>
@@ -488,26 +489,26 @@ export function JobProgress({ job, onSend, printerConfigured, tools }: { job: Jo
       {sliced && !perPlate && (
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
           <a className="btn btn-sm" href={`/api/jobs/${job.id}/file?kind=gcode`}>
-            <DownloadIcon size={14} /> G-code
+            <DownloadIcon size={14} /> {t("print.gcode")}
           </a>
           <a className="btn btn-sm" href={`/api/jobs/${job.id}/file?kind=3mf`}>
-            <DownloadIcon size={14} /> U1 3MF
+            <DownloadIcon size={14} /> {t("print.u1ThreeMf")}
           </a>
           {!sent && onSend && job.status !== "running" && (
             <button type="button" className="btn btn-sm btn-primary" onClick={onSend} disabled={!printerConfigured}>
-              <SendIcon size={14} /> Send to printer
+              <SendIcon size={14} /> {t("print.sendToPrinter")}
             </button>
           )}
           {sent && (
             <Link className="btn btn-sm" href="/printer">
-              Watch on printer page
+              {t("print.watchPrinter")}
             </Link>
           )}
         </div>
       )}
       {perPlate && sent && (
         <Link className="btn btn-sm" href="/printer" style={{ alignSelf: "flex-start" }}>
-          Watch on printer page
+          {t("print.watchPrinter")}
         </Link>
       )}
       {sliced && job.status !== "running" && (
@@ -519,14 +520,14 @@ export function JobProgress({ job, onSend, printerConfigured, tools }: { job: Jo
             layersDialog.current?.showModal();
           }}
         >
-          <LayersIcon size={16} /> Layer preview: check supports before printing
+          <LayersIcon size={16} /> {t("print.layerPreview")}
         </button>
       )}
       <dialog ref={layersDialog} className="layer-dialog" aria-labelledby={`layers-${job.id}`} onClose={() => setShowLayers(false)}>
         <div className="layer-dialog-head">
-          <h2 id={`layers-${job.id}`}>Layer preview · {job.title}</h2>
+          <h2 id={`layers-${job.id}`}>{t("print.layerPreviewTitle", { title: job.title })}</h2>
           <button type="button" className="btn btn-sm" onClick={() => layersDialog.current?.close()}>
-            Close
+            {t("print.close")}
           </button>
         </div>
         {/* Mounted only while open: the toolpaths of a big print take tens of megabytes. */}

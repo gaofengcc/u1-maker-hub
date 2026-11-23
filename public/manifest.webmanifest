@@ -1,8 +1,9 @@
 {
   "id": "/",
-  "name": "U1 Maker Hub",
-  "short_name": "Maker Hub",
-  "description": "Browse MakerWorld, re-slice for the Snapmaker U1, and print.",
+  "name": "U1 模型工坊",
+  "short_name": "U1 工坊",
+  "description": "浏览 MakerWorld 模型，重新切片给 Snapmaker U1 打印。",
+  "lang": "zh-CN",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
@@ -16,7 +17,7 @@
     { "src": "/icons/maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
   ],
   "shortcuts": [
-    { "name": "My printer", "url": "/printer", "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }] },
-    { "name": "Saved", "url": "/saved", "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }] }
+    { "name": "我的打印机", "url": "/printer", "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }] },
+    { "name": "收藏", "url": "/saved", "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }] }
   ]
 }

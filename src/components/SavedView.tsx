@@ -4,46 +4,47 @@ import Link from "next/link";
 import { useMemo, useState } from "react";
 import { useFavorites } from "@/lib/useFavorites";
 import type { FavoriteSource, SyncState } from "@/lib/favorites.ts";
+import { t } from "@/lib/i18n";
 import { CardSkeleton, ModelCard } from "./ModelCard";
 import { SearchIcon } from "./Icons";
 
 const SORTS = [
-  { key: "recent", label: "Recently saved" },
-  { key: "oldest", label: "Oldest first" },
-  { key: "popular", label: "Most downloaded" },
-  { key: "title", label: "A to Z" },
+  { key: "recent" },
+  { key: "oldest" },
+  { key: "popular" },
+  { key: "title" },
 ] as const;
 
 function savedAgo(iso: string, precise = false) {
   if (precise) {
     const minutes = Math.floor((Date.now() - new Date(iso).getTime()) / 60_000);
-    if (minutes < 1) return "just now";
-    if (minutes < 60) return `${minutes} min ago`;
+    if (minutes < 1) return t("saved.justNow");
+    if (minutes < 60) return t("saved.minutesAgo", { minutes });
   }
   const days = Math.floor((Date.now() - new Date(iso).getTime()) / 86_400_000);
-  if (days <= 0) return "today";
-  if (days === 1) return "yesterday";
-  if (days < 30) return `${days} days ago`;
+  if (days <= 0) return t("saved.today");
+  if (days === 1) return t("saved.yesterday");
+  if (days < 30) return t("saved.daysAgo", { days });
   return new Date(iso).toLocaleDateString();
 }
 
 const ORIGINS = [
-  { key: "all", label: "All" },
-  { key: "app", label: "Saved in the app" },
-  { key: "mw", label: "From MakerWorld" },
+  { key: "all" },
+  { key: "app" },
+  { key: "mw" },
 ] as const;
 
 const SOURCE_BADGES: Record<FavoriteSource, [string, string]> = {
-  app: ["", "Saved in the app"],
-  "mw-like": ["red", "Liked on MakerWorld"],
-  "mw-collect": ["orange", "Collected on MakerWorld"],
+  app: ["", "saved.sourceApp"],
+  "mw-like": ["red", "saved.sourceLiked"],
+  "mw-collect": ["orange", "saved.sourceCollected"],
 };
 
 function syncLine(sync: SyncState | null, syncing: boolean) {
-  if (syncing) return "Syncing with MakerWorld…";
-  if (!sync?.syncedAt && !sync?.error) return "Not synced with MakerWorld yet.";
-  if (sync.error) return sync.code === "login_required" || sync.code === "token_expired" ? null : `MakerWorld sync failed: ${sync.error}`;
-  return `Synced with MakerWorld ${savedAgo(sync.syncedAt!, true)} · ${sync.liked} liked, ${sync.collected} collected`;
+  if (syncing) return t("saved.syncWithMakerWorld");
+  if (!sync?.syncedAt && !sync?.error) return t("saved.notSynced");
+  if (sync.error) return sync.code === "login_required" || sync.code === "token_expired" ? null : t("saved.syncFailed", { error: sync.error });
+  return t("saved.synced", { ago: savedAgo(sync.syncedAt!, true), liked: sync.liked, collected: sync.collected });
 }
 
 export function SavedView() {
@@ -76,25 +77,25 @@ export function SavedView() {
     <main className="container" style={{ display: "flex", flexDirection: "column", gap: 20 }}>
       <section style={{ display: "flex", flexWrap: "wrap", justifyContent: "space-between", alignItems: "center", gap: 12 }}>
         <div style={{ display: "flex", alignItems: "baseline", gap: 12, flexWrap: "wrap" }}>
-          <h1 style={{ margin: 0, fontSize: 24 }}>Saved for later</h1>
-          {ready && <span className="muted small">{favorites.length} model{favorites.length === 1 ? "" : "s"}</span>}
+          <h1 style={{ margin: 0, fontSize: 24 }}>{t("saved.title")}</h1>
+          {ready && <span className="muted small">{t("saved.modelCount", { count: favorites.length })}</span>}
         </div>
         {favorites.length > 0 && (
           <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center", flex: "1 1 420px", justifyContent: "flex-end" }}>
             <label htmlFor="filter" className="sr-only">
-              Filter saved models
+              {t("saved.filterLabel")}
             </label>
             <div className="search" style={{ flex: "1 1 220px", maxWidth: 360 }}>
               <SearchIcon size={18} />
-              <input id="filter" type="search" placeholder="Filter by name or creator" value={filter} onChange={(e) => setFilter(e.target.value)} />
+              <input id="filter" type="search" placeholder={t("saved.filterPlaceholder")} value={filter} onChange={(e) => setFilter(e.target.value)} />
             </div>
             <label htmlFor="sort" className="sr-only">
-              Sort
+              {t("saved.sortLabel")}
             </label>
             <select id="sort" className="select" style={{ width: "auto" }} value={sort} onChange={(e) => setSort(e.target.value as typeof sort)}>
               {SORTS.map((s) => (
                 <option key={s.key} value={s.key}>
-                  {s.label}
+                  {t(`saved.sorts.${s.key}`)}
                 </option>
               ))}
             </select>
@@ -106,7 +107,7 @@ export function SavedView() {
         <span className="small muted" style={{ flex: 1 }}>
           {needsLogin ? (
             <>
-              To bring in the models you like or collect on MakerWorld, <Link href="/settings">log in with your Bambu account</Link>.
+              {t("saved.loginBefore")} <Link href="/settings">{t("saved.loginLink")}</Link>{t("saved.loginAfter")}
             </>
           ) : (
             syncLine(sync, syncing)
@@ -114,14 +115,14 @@ export function SavedView() {
         </span>
         {!needsLogin && (
           <button type="button" className="btn btn-sm" onClick={syncNow} disabled={syncing}>
-            {syncing ? "Syncing…" : "Sync now"}
+            {syncing ? t("saved.syncing") : t("saved.syncNow")}
           </button>
         )}
         {favorites.length > 0 && (
-          <div className="chips" role="group" aria-label="Where it was saved">
+          <div className="chips" role="group" aria-label={t("saved.whereSaved")}>
             {ORIGINS.map((o) => (
               <button key={o.key} type="button" className="chip" aria-pressed={origin === o.key} onClick={() => setOrigin(o.key)}>
-                {o.label}
+                {t(o.key === "all" ? "saved.originAll" : o.key === "app" ? "saved.originApp" : "saved.originMakerWorld")}
               </button>
             ))}
           </div>
@@ -136,30 +137,29 @@ export function SavedView() {
         </section>
       ) : favorites.length === 0 ? (
         <section className="panel" style={{ maxWidth: 560 }}>
-          <h2>Nothing saved yet</h2>
+          <h2>{t("saved.emptyTitle")}</h2>
           <p className="muted" style={{ lineHeight: 1.5 }}>
-            Tap the heart on any model while you browse, or press “Save for later” on a model page. Models you like or collect on MakerWorld show up here
-            too.
+            {t("saved.emptyDescription")}
           </p>
           <Link className="btn btn-primary" href="/" style={{ alignSelf: "flex-start" }}>
-            Explore models
+            {t("saved.explore")}
           </Link>
         </section>
       ) : shown.length === 0 ? (
-        <p className="muted">{filter ? `No saved model matches “${filter}”.` : "No saved model comes from there."}</p>
+        <p className="muted">{filter ? t("saved.noMatch", { filter }) : t("saved.noOrigin")}</p>
       ) : (
-        <section className="grid" aria-label="Saved models">
+        <section className="grid" aria-label={t("saved.modelsAria")}>
           {shown.map((f, i) => (
             <div key={f.id} style={{ display: "flex", flexDirection: "column", gap: 6 }}>
               <ModelCard model={f} priority={i < 8} />
               <span className="source-badges" style={{ paddingLeft: 4 }}>
                 {sourcesOf(f.id).map((s) => (
                   <span key={s} className={`badge ${SOURCE_BADGES[s][0]}`}>
-                    {SOURCE_BADGES[s][1]}
+                    {t(SOURCE_BADGES[s][1])}
                   </span>
                 ))}
                 <span className="small muted">
-                  {sourcesOf(f.id).includes("app") ? "Saved" : "Found"} {savedAgo(f.savedAt)}
+                  {sourcesOf(f.id).includes("app") ? t("saved.sourceSaved") : t("saved.sourceFound")} {savedAgo(f.savedAt)}
                 </span>
               </span>
             </div>

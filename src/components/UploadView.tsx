@@ -5,6 +5,7 @@ import type { Job } from "@/lib/jobs.ts";
 import type { PrintOptions, ToolLoad } from "@/lib/slicer.ts";
 import type { Upload } from "@/lib/uploads.ts";
 import { api } from "@/lib/format";
+import { t } from "@/lib/i18n";
 import { loadUploadMesh } from "@/lib/previewMesh";
 import { PrintSetup, type ColorSlot, type Mode } from "./PrintSetup";
 import { UploadIcon } from "./Icons";
@@ -37,9 +38,9 @@ function sendFile(file: File, onProgress: (fraction: number) => void): Promise<U
         }
       })();
       if (xhr.status >= 200 && xhr.status < 300 && body) resolve(body as Upload);
-      else reject(new Error(body?.error ?? `Upload failed (${xhr.status}).`));
+      else reject(new Error(body?.error ?? t("upload.failed", { status: xhr.status })));
     };
-    xhr.onerror = () => reject(new Error("Upload failed: the server could not be reached."));
+    xhr.onerror = () => reject(new Error(t("upload.serverUnreachable")));
     xhr.send(file);
   });
 }
@@ -79,7 +80,7 @@ export function UploadView({ settings, modes, defaults, initialId }: Props) {
   const pick = async (file: File | undefined) => {
     if (!file) return;
     if (!/\.(stl|3mf)$/i.test(file.name)) {
-      setError("Only STL and 3MF files can be uploaded.");
+      setError(t("upload.invalidType"));
       return;
     }
     setError(null);
@@ -109,10 +110,9 @@ export function UploadView({ settings, modes, defaults, initialId }: Props) {
   const dropzone = (
     <section className="panel" style={{ order: upload ? 8 : 1 }}>
       {/* With a model open, its name is the page title. */}
-      {upload ? <h2>Upload another STL or 3MF</h2> : <h1 style={{ margin: 0, fontSize: 24 }}>Upload an STL or 3MF</h1>}
+      {upload ? <h2>{t("upload.uploadAnother")}</h2> : <h1 style={{ margin: 0, fontSize: 24 }}>{t("upload.title")}</h1>}
       <p className="small muted" style={{ margin: 0 }}>
-        Print your own model: it is checked, shown on the U1 bed, then sliced with the same U1 presets as MakerWorld models. A 3MF project keeps its plates
-        and colours.
+        {t("upload.description")}
       </p>
       <label
         className={`dropzone${dragging ? " dragging" : ""}`}
@@ -131,12 +131,12 @@ export function UploadView({ settings, modes, defaults, initialId }: Props) {
         <UploadIcon size={28} />
         {progress === null ? (
           <>
-            <strong>Drop an STL or 3MF here or choose a file</strong>
-            <span className="small muted">STL in millimetres, or a 3MF from Bambu Studio, OrcaSlicer or any app, up to 200 MB</span>
+            <strong>{t("upload.dropPrompt")}</strong>
+            <span className="small muted">{t("upload.fileHint")}</span>
           </>
         ) : (
           <>
-            <strong>{progress < 1 ? `Uploading… ${Math.round(progress * 100)}%` : "Checking the model…"}</strong>
+            <strong>{progress < 1 ? t("upload.uploading", { percent: Math.round(progress * 100) }) : t("upload.checking")}</strong>
             <progress max={1} value={progress} style={{ width: "100%" }} />
           </>
         )}
@@ -144,19 +144,19 @@ export function UploadView({ settings, modes, defaults, initialId }: Props) {
       {error && <div className="notice error">{error}</div>}
       {recent.length > 0 && (
         <>
-          <h2 style={{ marginTop: 4 }}>Recent uploads</h2>
+          <h2 style={{ marginTop: 4 }}>{t("upload.recent")}</h2>
           <ul className="upload-list">
             {recent.map((u) => (
               <li key={u.id}>
                 <button type="button" className="upload-item" aria-pressed={upload?.id === u.id} onClick={() => open(u)}>
                   <span style={{ fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{u.name}</span>
                   <span className="small muted">
-                    {u.kind === "3mf" ? `3MF · ${u.project?.plates.length ?? 1} plate${(u.project?.plates.length ?? 1) > 1 ? "s" : ""}` : "STL"} ·{" "}
+                    {u.kind === "3mf" ? `3MF · ${t("upload.plateCount", { count: u.project?.plates.length ?? 1 })}` : "STL"} ·{" "}
                     {u.report.size.map((v) => v.toFixed(0)).join(" × ")} mm · {megabytes(u.bytes)}
                   </span>
                 </button>
-                <button type="button" className="btn btn-sm" onClick={() => remove(u)} aria-label={`Delete ${u.name}`}>
-                  Delete
+                <button type="button" className="btn btn-sm" onClick={() => remove(u)} aria-label={t("upload.deleteAria", { name: u.name })}>
+                  {t("upload.delete")}
                 </button>
               </li>
             ))}
@@ -195,24 +195,24 @@ export function UploadView({ settings, modes, defaults, initialId }: Props) {
             <h1 style={{ margin: 0, fontSize: 24, lineHeight: 1.25, overflowWrap: "anywhere" }}>{upload.name}</h1>
             <p className="small muted" style={{ margin: 0 }}>
               {project
-                ? `3MF project${project.printer ? ` made for ${project.printer}` : ""}. Its printer settings are replaced by U1 presets; geometry, plates and colours are kept.`
-                : "STL model, printed in one colour with U1 presets."}
+                ? t("upload.project3mf", { printer: project.printer ? t("upload.projectPrinter", { printer: project.printer }) : "" })
+                : t("upload.modelStl")}
             </p>
             <div className="estimates">
               <div>
-                <span>{project ? "Size of the plate" : "Size in the file"}</span>
+                <span>{project ? t("upload.plateSize") : t("upload.fileSize")}</span>
                 <span>{report.size.map((v) => v.toFixed(1)).join(" × ")} mm</span>
               </div>
               <div>
-                <span>Volume</span>
+                <span>{t("upload.volume")}</span>
                 <span>{report.volume != null ? `${report.volume.toFixed(1)} cm³` : "—"}</span>
               </div>
               <div>
-                <span>Triangles</span>
+                <span>{t("upload.triangles")}</span>
                 <span>{report.triangles.toLocaleString("en")}</span>
               </div>
               <div>
-                <span>File</span>
+                <span>{t("upload.file")}</span>
                 <span>{megabytes(upload.bytes)}</span>
               </div>
             </div>
@@ -221,7 +221,7 @@ export function UploadView({ settings, modes, defaults, initialId }: Props) {
         checks={report.checks}
         plates={(project?.plates ?? []).map((p) => ({
           index: p.index,
-          label: `Plate ${p.index}${p.name ? ` · ${p.name}` : ""} · ${p.report.size.map((v) => v.toFixed(0)).join(" × ")} mm`,
+          label: `${t("upload.plate", { index: p.index })}${p.name ? ` · ${p.name}` : ""} · ${p.report.size.map((v) => v.toFixed(0)).join(" × ")} mm`,
         }))}
         plate={plate}
         onPlate={setPlate}
@@ -243,7 +243,7 @@ export function UploadView({ settings, modes, defaults, initialId }: Props) {
           instanceId: 0,
           uploadId: upload.id,
           title: upload.name,
-          profile: project ? "Uploaded 3MF" : "Uploaded STL",
+          profile: project ? t("upload.uploaded3mf") : t("upload.uploadedStl"),
           cover,
           plate: s.plate,
           size: Math.round(s.transform.scale * 100),

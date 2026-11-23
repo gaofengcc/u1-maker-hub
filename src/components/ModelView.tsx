@@ -6,6 +6,7 @@ import type { Instance, ModelDetail } from "@/lib/makerworld.ts";
 import type { Job } from "@/lib/jobs.ts";
 import type { PrintOptions, ToolLoad } from "@/lib/slicer.ts";
 import { api, compact, duration, mwImage, mwSrcSet } from "@/lib/format";
+import { t } from "@/lib/i18n";
 import { FavoriteButton } from "./FavoriteButton";
 import { PrintSetup, type ColorSlot, type Mode } from "./PrintSetup";
 import { DownloadIcon, ExternalIcon, HeartIcon, PrintsIcon } from "./Icons";
@@ -51,7 +52,7 @@ export function ModelView({ design, settings, modes, defaults, filamentPresets }
   if (!instance) {
     return (
       <main className="container">
-        <div className="notice error">This model has no print profile on MakerWorld.</div>
+        <div className="notice error">{t("model.noProfile")}</div>
       </main>
     );
   }
@@ -63,8 +64,8 @@ export function ModelView({ design, settings, modes, defaults, filamentPresets }
 
   return (
     <main className="container">
-      <nav aria-label="Breadcrumb" className="small muted" style={{ marginBottom: 16, display: "flex", gap: 8, flexWrap: "wrap" }}>
-        <Link href="/">Explore</Link>
+      <nav aria-label={t("model.breadcrumb")} className="small muted" style={{ marginBottom: 16, display: "flex", gap: 8, flexWrap: "wrap" }}>
+        <Link href="/">{t("model.breadcrumb")}</Link>
         {design.categories[0] && (
           <>
             <span aria-hidden="true">/</span>
@@ -103,7 +104,7 @@ export function ModelView({ design, settings, modes, defaults, filamentPresets }
                     key={src}
                     type="button"
                     aria-pressed={i === picture}
-                    aria-label={`Picture ${i + 1}`}
+                    aria-label={t("model.picture", { n: i + 1 })}
                     onClick={() => setPicture(i)}
                     // Warm the large version on hover so switching pictures feels instant.
                     onPointerEnter={() => {
@@ -122,7 +123,7 @@ export function ModelView({ design, settings, modes, defaults, filamentPresets }
         footer={
           (design.summary || instance.summary) && (
             <section className="panel" style={{ order: 8 }}>
-              <h2>About this model</h2>
+              <h2>{t("model.about")}</h2>
               {instance.summary && <div className="summary" dangerouslySetInnerHTML={{ __html: instance.summary }} />}
               {design.summary && <div className="summary" dangerouslySetInnerHTML={{ __html: design.summary }} />}
             </section>
@@ -144,13 +145,13 @@ export function ModelView({ design, settings, modes, defaults, filamentPresets }
                 <HeartIcon size={14} /> {compact(design.likes)}
               </span>
               <span style={{ display: "flex", gap: 4, alignItems: "center" }}>
-                <PrintsIcon size={14} /> {compact(design.prints)} prints
+                <PrintsIcon size={14} /> {compact(design.prints)} {t("model.prints")}
               </span>
             </div>
             <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
-              <span className="badge">{design.license || "License not stated"}</span>
+              <span className="badge">{design.license || t("model.licenseUnknown")}</span>
               <a className="small" href={design.url} target="_blank" rel="noopener noreferrer" style={{ display: "inline-flex", gap: 4, alignItems: "center" }}>
-                Open on MakerWorld <ExternalIcon size={13} />
+                {t("model.openMakerWorld")} <ExternalIcon size={13} />
               </a>
             </div>
             <FavoriteButton
@@ -169,9 +170,9 @@ export function ModelView({ design, settings, modes, defaults, filamentPresets }
         }
         source={
           <section className="panel" style={{ order: 3 }}>
-            <h2>Print profile from MakerWorld</h2>
-            <p className="small muted">Creators publish several versions. Pick one: its geometry and colors are kept, its printer settings are replaced by U1 presets.</p>
-            <div className="profile-list" role="radiogroup" aria-label="Print profile">
+            <h2>{t("model.profileTitle")}</h2>
+            <p className="small muted">{t("model.profileDescription")}</p>
+            <div className="profile-list" role="radiogroup" aria-label={t("model.profileLabel")}>
               {design.instances.slice(0, 8).map((i) => (
                 <button
                   key={i.id}
@@ -190,7 +191,7 @@ export function ModelView({ design, settings, modes, defaults, filamentPresets }
                   <span style={{ display: "flex", flexDirection: "column", gap: 4, minWidth: 0 }}>
                     <span style={{ fontWeight: 600, fontSize: 14, overflow: "hidden", textOverflow: "ellipsis" }}>{i.title}</span>
                     <span className="small muted">
-                      {i.printer || "Bambu"} · {duration(i.seconds)} · {Math.round(i.grams)} g · {i.plates.length || 1} plate{i.plates.length > 1 ? "s" : ""}
+                      {i.printer || "Bambu"} · {duration(i.seconds)} · {Math.round(i.grams)} g · {i.plates.length || 1} {t("model.plates")}
                     </span>
                     <span style={{ display: "flex", gap: 4 }}>
                       {i.filaments.slice(0, 8).map((f, k) => (
@@ -205,13 +206,13 @@ export function ModelView({ design, settings, modes, defaults, filamentPresets }
         }
         plates={instance.plates.map((p) => ({
           index: p.index,
-          label: `Plate ${p.index}${p.name ? ` · ${p.name}` : ""} · ${duration(p.seconds)} · ${Math.round(p.grams)} g`,
+          label: `${t("model.plate", { n: p.index })}${p.name ? ` · ${p.name}` : ""} · ${duration(p.seconds)} · ${Math.round(p.grams)} g`,
         }))}
         plate={plate}
         onPlate={setPlate}
         slots={slots}
         filamentCount={maxSlot}
-        estimate={{ label: "MakerWorld time", seconds: selectedPlate?.seconds ?? instance.seconds, grams: selectedPlate?.grams ?? instance.grams }}
+        estimate={{ label: t("model.makerWorldTime"), seconds: selectedPlate?.seconds ?? instance.seconds, grams: selectedPlate?.grams ?? instance.grams }}
         mesh={{ load: () => loadPreviewMesh(instance.id, printedPlate), autoShow: false, available: settings.loggedIn }}
         creatorSupports={creatorSupports}
         canSlice={settings.loggedIn}
@@ -219,10 +220,10 @@ export function ModelView({ design, settings, modes, defaults, filamentPresets }
           <>
             {!settings.loggedIn && (
               <div className="notice">
-                Downloading from MakerWorld needs your Bambu account. <Link href="/settings">Log in in Settings</Link>.
+                {t("model.downloadNeedsAccount")} <Link href="/settings">{t("model.loginInSettings")}</Link>。
               </div>
             )}
-            {filamentPresets.length === 0 && <div className="notice error">OrcaSlicer U1 profiles were not found on this computer.</div>}
+            {filamentPresets.length === 0 && <div className="notice error">{t("model.profilesMissing")}</div>}
           </>
         }
         extraActions={
@@ -232,7 +233,7 @@ export function ModelView({ design, settings, modes, defaults, filamentPresets }
             aria-disabled={!settings.loggedIn}
             style={settings.loggedIn ? undefined : { opacity: 0.55, pointerEvents: "none" }}
           >
-            <DownloadIcon size={16} /> Original 3MF
+            <DownloadIcon size={16} /> {t("model.original3mf")}
           </a>
         }
         slice={(s, send) =>

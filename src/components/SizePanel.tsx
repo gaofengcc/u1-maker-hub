@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { t } from "@/lib/i18n";
 import { CubeIcon } from "./Icons";
 import { BedViewer, type FacePick } from "./BedViewer";
 import { layFaceFlat, OrientControls } from "./OrientControls";
@@ -50,7 +51,7 @@ export function SizePanel({
   onDims,
   colors,
   canDownload,
-  unavailableHint = "The preview needs the 3MF, so log in with your Bambu account in Settings.",
+  unavailableHint = t("size.unavailableHint"),
 }: Props) {
   const [show, setShow] = useState(autoShow);
   const [loaded, setLoaded] = useState<{ key: string; mesh: MeshData } | null>(null);
@@ -122,7 +123,7 @@ export function SizePanel({
   return (
     <section className="panel" style={{ order }} aria-labelledby="size-title">
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
-        <h2 id="size-title">Size &amp; preview</h2>
+        <h2 id="size-title">{t("size.title")}</h2>
         {changed && (
           <button
             type="button"
@@ -134,19 +135,19 @@ export function SizePanel({
               setPicking(false);
             }}
           >
-            Reset
+            {t("size.reset")}
           </button>
         )}
       </div>
 
       <label className="field" htmlFor="size">
         <span style={{ display: "flex", justifyContent: "space-between", fontSize: 14 }}>
-          <span style={{ fontWeight: 500 }}>Size</span>
+          <span style={{ fontWeight: 500 }}>{t("size.size")}</span>
           <strong style={{ fontSize: 16 }}>{size}%</strong>
         </span>
         <input id="size" type="range" min={10} max={300} step={5} value={size} onChange={(e) => onSize(Number(e.target.value))} />
       </label>
-      <div className="chips" role="group" aria-label="Quick sizes">
+      <div className="chips" role="group" aria-label={t("size.quickSizes")}>
         {SIZES.map((s) => (
           <button key={s} type="button" className="chip" aria-pressed={size === s} onClick={() => onSize(s)}>
             {s}%
@@ -155,18 +156,18 @@ export function SizePanel({
       </div>
 
       <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-        <span style={{ fontWeight: 500, fontSize: 14, flex: 1 }}>Rotation on the bed · {rotation}°</span>
-        <button type="button" className="btn btn-sm" onClick={() => onRotation((rotation + 270) % 360)} aria-label="Rotate 90 degrees counterclockwise">
+        <span style={{ fontWeight: 500, fontSize: 14, flex: 1 }}>{t("size.rotation", { degrees: rotation })}</span>
+        <button type="button" className="btn btn-sm" onClick={() => onRotation((rotation + 270) % 360)} aria-label={t("size.rotateCounterclockwise")}>
           ↺ 90°
         </button>
-        <button type="button" className="btn btn-sm" onClick={() => onRotation((rotation + 90) % 360)} aria-label="Rotate 90 degrees clockwise">
+        <button type="button" className="btn btn-sm" onClick={() => onRotation((rotation + 90) % 360)} aria-label={t("size.rotateClockwise")}>
           ↻ 90°
         </button>
       </div>
 
       {dims && (
         <p className="small" style={{ margin: 0 }}>
-          <span className="muted">Printed size: </span>
+          <span className="muted">{t("size.printedSize")}</span>
           <strong>
             {dims[0].toFixed(0)} × {dims[1].toFixed(0)} × {dims[2].toFixed(0)} mm
           </strong>
@@ -174,30 +175,28 @@ export function SizePanel({
       )}
       {tooBig && (
         <div className="notice error">
-          At this size the model does not fit the U1 ({bedW.toFixed(0)} × {bedD.toFixed(0)} × {U1_BED.height} mm).
+          {t("size.tooBig", { width: bedW.toFixed(0), depth: bedD.toFixed(0), height: U1_BED.height })}
         </div>
       )}
 
       {!show ? (
         <button type="button" className="btn" onClick={() => setShow(true)} disabled={!canDownload}>
-          <CubeIcon size={18} /> Show 3D preview
+          <CubeIcon size={18} /> {t("size.showPreview")}
         </button>
       ) : (
         <>
-          {!mesh && !error && <div className="preview-box muted small">Loading the model…</div>}
+          {!mesh && !error && <div className="preview-box muted small">{t("size.loading")}</div>}
           {error && <div className="notice error">{error}</div>}
           {mesh && <OrientControls orient={orient} onOrient={onOrient} picking={picking} onPicking={setPicking} />}
           {mesh && <BedViewer parts={parts} fit pick={pick} />}
           {mesh && (
             <p className="small muted" style={{ margin: 0 }}>
-              {picking
-                ? "Click the face of the model that should touch the bed. Drag still turns the view."
-                : "Drag to turn, pinch or scroll to zoom. The grid is the U1 bed, 1 cm squares. Laying the model on another side changes where it needs supports."}
+              {picking ? t("size.pickFace") : t("size.dragPreview")}
             </p>
           )}
         </>
       )}
-      {!show && !isNoOrient(orient) && <p className="small muted" style={{ margin: 0 }}>Laid on another side. Show the 3D preview to check it.</p>}
+      {!show && !isNoOrient(orient) && <p className="small muted" style={{ margin: 0 }}>{t("size.laidOtherSide")}</p>}
       {!canDownload && !show && <p className="small muted" style={{ margin: 0 }}>{unavailableHint}</p>}
     </section>
   );

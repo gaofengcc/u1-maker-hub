@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { createBedScene, type BedScene } from "@/lib/bedScene";
+import { t } from "@/lib/i18n";
 import { loadToolpath, type Toolpath } from "@/lib/toolpathView";
 
 /** Feature colours, close to OrcaSlicer's preview so the two look alike. Supports stand out in green. */
@@ -131,14 +132,14 @@ export function ToolpathViewer({ jobId, plates }: { jobId: string; plates: numbe
     <div className="toolpath">
       <div>
         <div ref={box} className="preview-box">
-          {!toolpath && !error && <span className="muted small">Reading the G-code…</span>}
+          {!toolpath && !error && <span className="muted small">{t("toolpath.reading")}</span>}
         </div>
         {error && <div className="notice error">{error}</div>}
       </div>
       <div className="toolpath-controls">
         {plates > 1 && (
           <label className="field" htmlFor={`tp-plate-${jobId}`}>
-            <span className="label">U1 plate</span>
+            <span className="label">{t("toolpath.plateLabel")}</span>
             <select
               id={`tp-plate-${jobId}`}
               className="select"
@@ -150,7 +151,7 @@ export function ToolpathViewer({ jobId, plates }: { jobId: string; plates: numbe
             >
               {Array.from({ length: plates }, (_, i) => (
                 <option key={i} value={i + 1}>
-                  Plate {i + 1}
+                  {t("toolpath.plate", { index: i + 1 })}
                 </option>
               ))}
             </select>
@@ -160,9 +161,9 @@ export function ToolpathViewer({ jobId, plates }: { jobId: string; plates: numbe
           <>
             <label className="field" htmlFor={`tp-layer-${jobId}`}>
               <span style={{ display: "flex", justifyContent: "space-between", fontSize: 14 }}>
-                <span style={{ fontWeight: 500 }}>Layer</span>
+                <span style={{ fontWeight: 500 }}>{t("toolpath.layer")}</span>
                 <strong>
-                  {top + 1} of {toolpath.layers.length} · {toolpath.layers[top]?.toFixed(2)} mm
+                  {t("toolpath.layerProgress", { current: top + 1, total: toolpath.layers.length, height: toolpath.layers[top]?.toFixed(2) ?? "" })}
                 </strong>
               </span>
               <input
@@ -176,23 +177,23 @@ export function ToolpathViewer({ jobId, plates }: { jobId: string; plates: numbe
             </label>
             <div className={`notice small${supportShare > 0 ? " ok" : ""}`}>
               {supportShare > 0
-                ? `Supports are in this slice: ${(supportShare * 100).toFixed(1)}% of the extruded length, shown in green.`
-                : "No supports in this slice. Check that overhangs (blue) are gentle enough to print in the air."}
+                ? t("toolpath.supportsPresent", { percent: (supportShare * 100).toFixed(1) })
+                : t("toolpath.noSupports")}
             </div>
-            <ul className="toolpath-legend" aria-label="Features">
+            <ul className="toolpath-legend" aria-label={t("toolpath.features")}>
               {toolpath.features.map((f) => (
                 <li key={f.type}>
                   <label>
                     <input type="checkbox" checked={!hidden.has(f.type)} onChange={() => toggle(f.type)} />
                     <span className="swatch" style={{ width: 14, height: 14, background: colorOf(f.type) }} />
-                    <span style={{ flex: 1 }}>{f.type}</span>
+                    <span style={{ flex: 1 }}>{t(`toolpath.feature.${f.type}`)}</span>
                     <span className="muted">{total ? `${((f.mm / total) * 100).toFixed(1)}%` : ""}</span>
                   </label>
                 </li>
               ))}
             </ul>
             <p className="small muted" style={{ margin: 0 }}>
-              Drag to turn, pinch or scroll to zoom. Move the layer slider down to look inside. Untick a feature to hide it.
+              {t("toolpath.interactionHint")}
             </p>
           </>
         )}

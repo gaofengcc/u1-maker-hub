@@ -8,10 +8,10 @@ import "./globals.css";
 const inter = Inter({ variable: "--font-inter", subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "U1 Maker Hub",
-  description: "Browse MakerWorld, re-slice for the Snapmaker U1, and print.",
-  applicationName: "U1 Maker Hub",
-  appleWebApp: { capable: true, title: "Maker Hub", statusBarStyle: "default" },
+  title: "U1 模型工坊",
+  description: "浏览 MakerWorld 模型，重新切片给 Snapmaker U1 打印。",
+  applicationName: "U1 模型工坊",
+  appleWebApp: { capable: true, title: "U1 模型工坊", statusBarStyle: "default" },
   formatDetection: { telephone: false },
 };
 
@@ -24,7 +24,7 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
-    <html lang="en" className={inter.variable}>
+    <html lang="zh-CN" className={inter.variable}>
       <head>
         {/* Added by hand rather than through metadata: the app sits behind an auth gateway, so the manifest request must carry cookies. */}
         <link rel="manifest" href="/manifest.webmanifest" crossOrigin="use-credentials" />
@@ -40,7 +40,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
         </Suspense>
         {children}
         <footer className="footer">
-          Models come from MakerWorld and keep their creators&apos; licenses. Personal use only.
+          模型来自 MakerWorld，版权归原作者所有，仅供个人使用。
         </footer>
         <ServiceWorker />
       </body>

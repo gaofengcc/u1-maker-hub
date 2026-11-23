@@ -6,6 +6,7 @@ import type { Job } from "@/lib/jobs.ts";
 import type { PlateChange, PlateEntry } from "@/lib/plate.ts";
 import type { PrintOptions, ToolLoad } from "@/lib/slicer.ts";
 import { api, duration, euros, inkFor, mwImage, slicedPrice } from "@/lib/format";
+import { t } from "@/lib/i18n";
 import { footprint, MAX_BEDS, packBeds } from "@/lib/packing";
 import { loadPreviewMesh, loadUploadMesh, meshBox, type MeshData } from "@/lib/previewMesh";
 import { usePlate } from "@/lib/usePlate";
@@ -140,19 +141,18 @@ export function PlateView({ settings, modes, defaults }: Props) {
     }
   };
 
-  if (!ready) return <main className="container muted">Loading the plate…</main>;
+  if (!ready) return <main className="container muted">{t("plate.loading")}</main>;
 
   if (!entries.length) {
     return (
       <main className="container">
         <section className="panel" style={{ maxWidth: 560 }}>
-          <h1 style={{ margin: 0, fontSize: 22 }}>The plate is empty</h1>
+          <h1 style={{ margin: 0, fontSize: 22 }}>{t("plate.emptyTitle")}</h1>
           <p className="muted" style={{ lineHeight: 1.5 }}>
-            Print several models at once: open a model, pick its profile, size and colours, then press <strong>Add to plate</strong>. Everything you add here is placed
-            together on the U1 bed. When it does not fit on one plate, the rest goes on a second plate, printed after the first.
+            {t("plate.emptyDescription")} <strong>{t("plate.addToPlate")}</strong>{t("plate.emptyDescriptionAfter")}
           </p>
           <Link className="btn btn-primary" href="/" style={{ alignSelf: "flex-start" }}>
-            Find models
+            {t("plate.findModels")}
           </Link>
         </section>
         {job && (
@@ -172,28 +172,27 @@ export function PlateView({ settings, modes, defaults }: Props) {
     <main className="container" style={{ display: "flex", flexDirection: "column", gap: 16 }}>
       <section style={{ display: "flex", flexWrap: "wrap", alignItems: "baseline", justifyContent: "space-between", gap: 12 }}>
         <div style={{ display: "flex", alignItems: "baseline", gap: 12, flexWrap: "wrap" }}>
-          <h1 style={{ margin: 0, fontSize: 24 }}>Plate</h1>
+          <h1 style={{ margin: 0, fontSize: 24 }}>{t("plate.title")}</h1>
           <span className="muted small">
-            {entries.length} model{entries.length > 1 ? "s" : ""} · {entries.reduce((n, e) => n + e.copies, 0)} object
-            {entries.reduce((n, e) => n + e.copies, 0) > 1 ? "s" : ""}
+            {t("plate.modelCount", { models: entries.length, objects: entries.reduce((n, e) => n + e.copies, 0) })}
           </span>
         </div>
-        <button type="button" className="btn btn-sm" onClick={() => window.confirm("Remove every model from the plate?") && clear()}>
-          Clear plate
+        <button type="button" className="btn btn-sm" onClick={() => window.confirm(t("plate.clearConfirm")) && clear()}>
+          {t("plate.clear")}
         </button>
       </section>
 
       <div className="two-col">
         <section className="col-main">
           <section className="panel" style={{ order: 2 }} aria-labelledby="layout-title">
-            <h2 id="layout-title">{bedCount > 1 ? `Layout on ${bedCount} U1 plates` : "Layout on the U1 bed"}</h2>
+            <h2 id="layout-title">{bedCount > 1 ? t("plate.layoutMultiple", { count: bedCount }) : t("plate.layoutSingle")}</h2>
             {bedCount > 1 && (
-              <div className="bed-tabs" role="tablist" aria-label="U1 plates">
+              <div className="bed-tabs" role="tablist" aria-label={t("plate.plates")}>
                 {layout!.beds.map((parts, i) => (
                   <button key={i} type="button" role="tab" aria-selected={shownBed === i + 1} onClick={() => setViewBed(i + 1)}>
-                    Plate {i + 1}
+                    {t("plate.plate", { number: i + 1 })}
                     <small>
-                      {parts.length} object{parts.length > 1 ? "s" : ""}
+                      {t("plate.objects", { count: parts.length })}
                     </small>
                   </button>
                 ))}
@@ -201,31 +200,31 @@ export function PlateView({ settings, modes, defaults }: Props) {
             )}
             {!settings.loggedIn && entries.some((e) => !e.uploadId) ? (
               <div className="notice">
-                Placing models needs their 3MF files. <Link href="/settings">Log in with your Bambu account</Link>.
+                {t("plate.loginToPlaceBefore")} <Link href="/settings">{t("plate.loginBambu")}</Link>{t("plate.loginToPlaceAfter")}
               </div>
             ) : loading || !layout ? (
-              <div className="preview-box muted small">Loading the models…</div>
+              <div className="preview-box muted small">{t("plate.loadingModels")}</div>
             ) : (
               <BedViewer parts={layout.beds[shownBed - 1] ?? []} pick={pick} />
             )}
             {pick && (
               <div className="notice">
-                Click the face of <strong>{entries.find((e) => e.id === pickingId)?.title}</strong> that should touch the bed.{" "}
-                {bedCount > 1 && "If it is on another U1 plate, open that plate's tab first. "}
+                {t("plate.clickFaceBefore")} <strong>{entries.find((e) => e.id === pickingId)?.title}</strong>{t("plate.clickFaceAfter")}{" "}
+                {bedCount > 1 && `${t("plate.otherPlateHint")} `}
                 <button type="button" className="btn btn-sm" onClick={() => setPickingId(null)}>
-                  Cancel
+                  {t("plate.cancel")}
                 </button>
               </div>
             )}
-            {Object.keys(errors).length > 0 && <div className="notice error">Some models could not be loaded: {Object.values(errors)[0]}</div>}
+            {Object.keys(errors).length > 0 && <div className="notice error">{t("plate.loadError", { error: Object.values(errors)[0] })}</div>}
             {layout && layout.missing.length > 0 && (
-              <div className="notice error">Too big for the U1 bed: {layout.missing.join(", ")}. Make these models smaller or rotate them.</div>
+              <div className="notice error">{t("plate.tooBig", { models: layout.missing.join(", ") })}</div>
             )}
             {fits && (
               <p className="small muted" style={{ margin: 0 }}>
-                {layout.objects} object{layout.objects > 1 ? "s" : ""} placed automatically, front to back, keeping the back-left corner free for the prime tower.
-                {bedCount > 1 && " What does not fit goes on the next plate; each plate is a separate print. Choose a plate on a model to keep it there."}{" "}
-                Colours show the toolhead each model colour prints with; change them on each model.
+                {t("plate.placedAutomatically", { count: layout.objects })}{" "}
+                {bedCount > 1 && `${t("plate.overflowHint")} `}
+                {t("plate.colorsHint")}
               </p>
             )}
           </section>
@@ -236,7 +235,7 @@ export function PlateView({ settings, modes, defaults }: Props) {
         </section>
 
         <aside className="col-side">
-          <section className="panel" style={{ order: 1 }} aria-label="Models on the plate">
+          <section className="panel" style={{ order: 1 }} aria-label={t("plate.modelsOnPlate")}>
             {entries.map((e) => (
               <PlateRow
                 key={e.id}
@@ -252,7 +251,7 @@ export function PlateView({ settings, modes, defaults }: Props) {
               />
             ))}
             <Link className="small" href="/">
-              + Add another model
+              {t("plate.addAnother")}
             </Link>
           </section>
 
@@ -262,16 +261,16 @@ export function PlateView({ settings, modes, defaults }: Props) {
 
           <section className="panel" style={{ order: 5 }}>
             <button type="button" className="btn btn-primary btn-lg" disabled={busy || !fits || !settings.printerConfigured} onClick={() => start(true)}>
-              <SendIcon size={20} /> {bedCount > 1 ? `Slice ${bedCount} plates & print plate 1` : <>Slice plate &amp; print</>}
+              <SendIcon size={20} /> {bedCount > 1 ? t("plate.slicePlatesAndPrint", { count: bedCount }) : t("plate.sliceAndPrint")}
             </button>
-            {bedCount > 1 && <p className="small muted">The U1 prints one plate at a time. Send the next plate from here once the bed is cleared.</p>}
+            {bedCount > 1 && <p className="small muted">{t("plate.oneAtTime")}</p>}
             {!settings.printerConfigured && (
               <p className="small muted">
-                To print directly, add your printer address in <Link href="/settings">Settings</Link>. You can still slice and download.
+                {t("plate.directPrintHintBefore")}<Link href="/settings">{t("printer.openSettings")}</Link>{t("plate.directPrintHintAfter")}
               </p>
             )}
             <button type="button" className="btn" disabled={busy || !fits} onClick={() => start(false)}>
-              {bedCount > 1 ? `Slice ${bedCount} plates only` : "Slice only"}
+              {bedCount > 1 ? t("plate.slicePlatesOnly", { count: bedCount }) : t("plate.sliceOnly")}
             </button>
             {submitError && <div className="notice error">{submitError}</div>}
             {job && <JobProgress job={job} onSend={() => sendExisting(1)} printerConfigured={settings.printerConfigured} tools={settings.tools} />}
@@ -300,22 +299,22 @@ function JobPlates({
   onSend: (plate: number) => void;
 }) {
   return (
-    <ol className="job-plates" aria-label="U1 plates">
+    <ol className="job-plates" aria-label={t("plate.plates")}>
       {job.plates!.map((p, i) => (
         <li key={i}>
           <div style={{ display: "flex", flexDirection: "column", gap: 2, minWidth: 0 }}>
-            <strong>Plate {i + 1}</strong>
+            <strong>{t("plate.plate", { number: i + 1 })}</strong>
             <span className="small muted">
               {duration(p.stats.seconds)} · {p.stats.grams != null ? `${p.stats.grams.toFixed(1)} g` : "—"} · {euros(slicedPrice(p.stats, job.filamentToTool, tools))}
-              {p.remoteName ? " · sent" : ""}
+              {p.remoteName ? ` · ${t("plate.sent")}` : ""}
             </span>
           </div>
           <div style={{ display: "flex", gap: 6, flexWrap: "wrap", justifyContent: "flex-end" }}>
-            <a className="btn btn-sm" href={`/api/jobs/${job.id}/file?kind=gcode&plate=${i + 1}`} aria-label={`Download plate ${i + 1} G-code`}>
+            <a className="btn btn-sm" href={`/api/jobs/${job.id}/file?kind=gcode&plate=${i + 1}`} aria-label={t("plate.downloadPlate", { number: i + 1 })}>
               <DownloadIcon size={14} /> G-code
             </a>
             <button type="button" className={`btn btn-sm${p.remoteName ? "" : " btn-primary"}`} disabled={busy || !printerConfigured} onClick={() => onSend(i + 1)}>
-              <SendIcon size={14} /> {p.remoteName ? "Print again" : `Print plate ${i + 1}`}
+              <SendIcon size={14} /> {p.remoteName ? t("plate.printAgain") : t("plate.printPlate", { number: i + 1 })}
             </button>
           </div>
         </li>
@@ -379,7 +378,7 @@ function PlateRow({
           </Link>
           <span className="small muted ellipsis">
             {entry.profile}
-            {entry.plate > 1 ? ` · plate ${entry.plate}` : ""}
+            {entry.plate > 1 ? t("plate.plateSuffix", { number: entry.plate }) : ""}
           </span>
           {dims && (
             <span className="small muted">
@@ -387,25 +386,25 @@ function PlateRow({
             </span>
           )}
         </div>
-        <button type="button" className="btn btn-sm" onClick={onRemove} aria-label={`Remove ${entry.title}`}>
-          Remove
+        <button type="button" className="btn btn-sm" onClick={onRemove} aria-label={t("plate.removeAria", { title: entry.title })}>
+          {t("plate.remove")}
         </button>
       </div>
-      <div className="plate-colors" role="group" aria-label={`Colours of ${entry.title}`}>
+      <div className="plate-colors" role="group" aria-label={t("plate.colorsOf", { title: entry.title })}>
         {filaments.map((f) => {
           const tool = entry.filamentToTool[f - 1] ?? 0;
           const color = tools[tool]?.color ?? "#9CA3AF";
-          const label = filaments.length > 1 || f > 1 ? `Colour ${f}` : "Colour";
+          const label = filaments.length > 1 || f > 1 ? t("plate.colorN", { number: f }) : t("plate.color");
           return (
             <label key={f} className="plate-color">
               <span className="tool-chip" style={{ width: 28, height: 28, fontSize: 11, background: color, color: inkFor(color) }} aria-hidden>
                 T{tool + 1}
               </span>
               <span className="small muted">{label}</span>
-              <select className="select select-sm" style={{ borderColor: color }} value={tool} onChange={(e) => setTool(f, Number(e.target.value))} aria-label={`Toolhead for ${label.toLowerCase()} of ${entry.title}`}>
-                {tools.map((t, i) => (
+              <select className="select select-sm" style={{ borderColor: color }} value={tool} onChange={(e) => setTool(f, Number(e.target.value))} aria-label={t("plate.toolheadFor", { color: label, title: entry.title })}>
+                {tools.map((tool, i) => (
                   <option key={i} value={i}>
-                    T{i + 1} · {shortPreset(t.preset)}
+                    T{i + 1} · {shortPreset(tool.preset)}
                   </option>
                 ))}
               </select>
@@ -414,14 +413,14 @@ function PlateRow({
         })}
       </div>
       <div className="plate-controls">
-        <div className="stepper" role="group" aria-label="Copies">
-          <button type="button" onClick={() => onChange({ copies: entry.copies - 1 })} disabled={entry.copies <= 1} aria-label="One copy less">
+        <div className="stepper" role="group" aria-label={t("plate.copies")}>
+          <button type="button" onClick={() => onChange({ copies: entry.copies - 1 })} disabled={entry.copies <= 1} aria-label={t("plate.oneCopyLess")}>
             −
           </button>
           <span>
-            {entry.copies} cop{entry.copies > 1 ? "ies" : "y"}
+            {t("plate.copy", { count: entry.copies })}
           </span>
-          <button type="button" onClick={() => onChange({ copies: entry.copies + 1 })} disabled={entry.copies >= 20} aria-label="One copy more">
+          <button type="button" onClick={() => onChange({ copies: entry.copies + 1 })} disabled={entry.copies >= 20} aria-label={t("plate.oneCopyMore")}>
             +
           </button>
         </div>
@@ -435,25 +434,25 @@ function PlateRow({
             onChange={(e) => setDraft(e.target.value)}
             onBlur={commitSize}
             onKeyDown={(e) => e.key === "Enter" && commitSize()}
-            aria-label="Size in percent"
+            aria-label={t("plate.sizePercent")}
           />
           %
         </label>
-        <button type="button" className="btn btn-sm" onClick={() => onChange({ rotation: (entry.rotation + 90) % 360 })} aria-label="Rotate 90 degrees clockwise">
+        <button type="button" className="btn btn-sm" onClick={() => onChange({ rotation: (entry.rotation + 90) % 360 })} aria-label={t("plate.rotate")}>
           ↻ {entry.rotation}°
         </button>
         <select
           className="select select-sm"
           value={entry.bed ?? 0}
           onChange={(e) => onChange({ bed: Number(e.target.value) })}
-          aria-label="U1 plate"
-          title="Which U1 plate prints this model"
+          aria-label={t("plate.u1Plate")}
+          title={t("plate.whichPlate")}
         >
-          <option value={0}>{placedOn.length && beds > 1 ? `Auto · plate ${placedOn.join(", ")}` : "Plate: auto"}</option>
+          <option value={0}>{placedOn.length && beds > 1 ? t("plate.autoPlate", { plates: placedOn.join(", ") }) : t("plate.plateAuto")}</option>
           {Array.from({ length: bedChoices }, (_, i) => (
             <option key={i + 1} value={i + 1}>
-              Plate {i + 1}
-              {i + 1 > beds ? " (new)" : ""}
+              {t("plate.plate", { number: i + 1 })}
+              {i + 1 > beds ? ` ${t("plate.newPlate")}` : ""}
             </option>
           ))}
         </select>

@@ -1,6 +1,7 @@
 "use client";
 
 import { faceDown, isNoOrient, multiply, NO_ORIENT, tilt, type Orient } from "@/lib/orient";
+import { t } from "@/lib/i18n";
 
 /** The new orientation once the clicked face (normal in the model's own coordinates) lies on the bed. */
 export function layFaceFlat(orient: Orient | undefined, normal: [number, number, number]): Orient | undefined {
@@ -33,19 +34,19 @@ export function OrientControls({ orient, onOrient, picking, onPicking, compact =
     onOrient(isNoOrient(next) ? undefined : next);
   };
   return (
-    <div className="orient-controls" role="group" aria-label="Lay on another side">
-      {!compact && <span className="orient-title">Lay on another side</span>}
-      <button type="button" className="btn btn-sm" onClick={() => turn("x", -90)} aria-label="Tip backwards a quarter turn" title="Tip backwards">
-        ⤒ Tip back
+    <div className="orient-controls" role="group" aria-label={t("orient.groupLabel")}>
+      {!compact && <span className="orient-title">{t("orient.title")}</span>}
+      <button type="button" className="btn btn-sm" onClick={() => turn("x", -90)} aria-label={t("orient.tipBackAria")} title={t("orient.tipBack")}>
+        ⤒ {t("orient.tipBack")}
       </button>
-      <button type="button" className="btn btn-sm" onClick={() => turn("x", 90)} aria-label="Tip forwards a quarter turn" title="Tip forwards">
-        ⤓ Tip forward
+      <button type="button" className="btn btn-sm" onClick={() => turn("x", 90)} aria-label={t("orient.tipForwardAria")} title={t("orient.tipForward")}>
+        ⤓ {t("orient.tipForward")}
       </button>
-      <button type="button" className="btn btn-sm" onClick={() => turn("y", 90)} aria-label="Tip onto its side a quarter turn" title="Tip onto its side">
-        ⇥ On its side
+      <button type="button" className="btn btn-sm" onClick={() => turn("y", 90)} aria-label={t("orient.sideAria")} title={t("orient.side")}>
+        ⇥ {t("orient.side")}
       </button>
-      <button type="button" className="btn btn-sm" aria-pressed={picking} onClick={() => onPicking(!picking)} title="Then click the face that should touch the bed">
-        {picking ? "Click a face… (cancel)" : "▣ Lay a face flat"}
+      <button type="button" className="btn btn-sm" aria-pressed={picking} onClick={() => onPicking(!picking)} title={t("orient.layFaceTitle")}>
+        {picking ? t("orient.cancelFace") : t("orient.layFace")}
       </button>
       {!isNoOrient(orient) && (
         <button
@@ -56,7 +57,7 @@ export function OrientControls({ orient, onOrient, picking, onPicking, compact =
             onPicking(false);
           }}
         >
-          Back as in the file
+          {t("orient.restore")}
         </button>
       )}
     </div>

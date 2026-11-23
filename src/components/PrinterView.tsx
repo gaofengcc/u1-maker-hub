@@ -5,6 +5,7 @@ import { useCallback, useEffect, useState } from "react";
 import type { PrinterStatus, ToolState } from "@/lib/printer.ts";
 import type { Job } from "@/lib/jobs.ts";
 import { api, duration, inkFor } from "@/lib/format";
+import { t } from "@/lib/i18n";
 import { PauseIcon, PlayIcon, PowerIcon, StopIcon } from "./Icons";
 import { CameraView } from "./CameraView";
 
@@ -72,7 +73,7 @@ export function PrinterView() {
   };
 
   const switchPower = async (on: boolean) => {
-    if (!on && !window.confirm("Turn the printer off? This cuts its power.")) return;
+    if (!on && !window.confirm(t("printer.powerOffConfirm"))) return;
     setPending("power");
     setActionError(null);
     try {
@@ -85,16 +86,16 @@ export function PrinterView() {
     }
   };
 
-  if (!status) return <main className="container muted">Connecting to the printer…</main>;
+  if (!status) return <main className="container muted">{t("printer.connecting")}</main>;
 
   if (!status.configured) {
     return (
       <main className="container">
         <section className="panel" style={{ maxWidth: 560 }}>
-          <h1 style={{ margin: 0, fontSize: 22 }}>No printer yet</h1>
-          <p className="muted">Add your Snapmaker U1&apos;s network address to see its state and control it from here.</p>
+          <h1 style={{ margin: 0, fontSize: 22 }}>{t("printer.notConfiguredTitle")}</h1>
+          <p className="muted">{t("printer.notConfiguredDescription")}</p>
           <Link className="btn btn-primary" href="/settings" style={{ alignSelf: "flex-start" }}>
-            Open Settings
+            {t("printer.openSettings")}
           </Link>
         </section>
       </main>
@@ -111,24 +112,26 @@ export function PrinterView() {
         <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
           <h1 style={{ margin: 0, fontSize: 24 }}>Snapmaker U1</h1>
           <span className={`badge ${!online ? "red" : s?.state === "error" ? "red" : printing ? "green" : ""}`} style={{ fontSize: 13, padding: "6px 12px" }}>
-            {!online ? "Offline" : stateLabel(s!.state, s!.klippy)}
+            {!online ? t("printer.offline") : stateLabel(s!.state, s!.klippy)}
           </span>
-          {s?.message && <span className="small muted">{s.message}</span>}
+          {s?.message && ["paused", "error", "cancelled"].includes(String(s.state)) && (
+            <span className="small muted">{s.message}</span>
+          )}
         </div>
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
           {printing && (
             <>
               {s?.state === "paused" ? (
                 <button className="btn" disabled={!!pending} onClick={() => act({ action: "resume" })}>
-                  <PlayIcon size={18} /> Resume
+                  <PlayIcon size={18} /> {t("printer.resume")}
                 </button>
               ) : (
                 <button className="btn" disabled={!!pending} onClick={() => act({ action: "pause" })}>
-                  <PauseIcon size={18} /> Pause
+                  <PauseIcon size={18} /> {t("printer.pause")}
                 </button>
               )}
-              <button className="btn btn-danger" disabled={!!pending} onClick={() => act({ action: "cancel" }, "Cancel this print? It cannot be resumed.")}>
-                <StopIcon size={18} /> Cancel
+              <button className="btn btn-danger" disabled={!!pending} onClick={() => act({ action: "cancel" }, t("printer.cancelConfirm"))}>
+                <StopIcon size={18} /> {t("printer.cancel")}
               </button>
             </>
           )}
@@ -136,7 +139,7 @@ export function PrinterView() {
         </div>
       </section>
 
-      {!online && <div className="notice error">{(status as { error?: string }).error ?? "The printer does not answer."}</div>}
+      {!online && <div className="notice error">{(status as { error?: string }).error ?? t("printer.noAnswer")}</div>}
       {actionError && <div className="notice error">{actionError}</div>}
 
       {/* On phones the two columns merge into one; `order` keeps the controls above the job history. */}
@@ -150,41 +153,41 @@ export function PrinterView() {
             <section className="panel" style={{ order: 2 }}>
               <div style={{ display: "flex", gap: 16, alignItems: "center", flexWrap: "wrap" }}>
                 <div style={{ flex: 1, minWidth: 200, display: "flex", flexDirection: "column", gap: 4 }}>
-                  <span style={{ fontSize: 17, fontWeight: 700 }}>{s.filename || "No active print"}</span>
+                  <span style={{ fontSize: 17, fontWeight: 700 }}>{s.filename || t("printer.noActivePrint")}</span>
                   <span className="small muted">
-                    {s.layer != null && s.totalLayers ? `Layer ${s.layer} of ${s.totalLayers}` : printing ? "Starting…" : "Idle"}
-                    {printing ? ` · ${duration(s.printSeconds)} elapsed` : ""}
+                    {s.layer != null && s.totalLayers ? t("printer.layerOf", { current: s.layer, total: s.totalLayers }) : printing ? t("printer.starting") : t("printer.idle")}
+                    {printing ? ` · ${t("printer.elapsed", { time: duration(s.printSeconds) })}` : ""}
                   </span>
                 </div>
                 {printing && (
                   <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 2 }}>
                     <span style={{ fontSize: 28, fontWeight: 700 }}>{Math.round(s.progress * 100)}%</span>
-                    <span className="small muted">{s.etaSeconds ? `${duration(s.etaSeconds)} left` : ""}</span>
+                    <span className="small muted">{s.etaSeconds ? t("printer.left", { time: duration(s.etaSeconds) }) : ""}</span>
                   </div>
                 )}
               </div>
-              <div className="progress" role="progressbar" aria-valuenow={Math.round(s.progress * 100)} aria-valuemin={0} aria-valuemax={100} aria-label="Print progress">
+              <div className="progress" role="progressbar" aria-valuenow={Math.round(s.progress * 100)} aria-valuemin={0} aria-valuemax={100} aria-label={t("printer.printProgress")}>
                 <div style={{ width: `${Math.round(s.progress * 100)}%` }} />
               </div>
             </section>
           )}
 
           <section className="panel" style={{ order: 6 }}>
-            <h2>Recent jobs from this app</h2>
+            <h2>{t("printer.recentJobs")}</h2>
             {jobs.length === 0 ? (
               <p className="small muted">
-                Nothing yet. Pick a model in <Link href="/">Explore</Link>.
+                {t("printer.nothingYetBefore")}<Link href="/">{t("printer.explore")}</Link>{t("printer.nothingYetAfter")}
               </p>
             ) : (
               <div className="table-wrap">
                 <table style={{ minWidth: 480 }}>
                   <thead>
                     <tr>
-                      <th scope="col">Model</th>
-                      <th scope="col">U1 time</th>
-                      <th scope="col">Result</th>
+                      <th scope="col">{t("printer.model")}</th>
+                      <th scope="col">{t("printer.u1Time")}</th>
+                      <th scope="col">{t("printer.result")}</th>
                       <th scope="col">
-                        <span className="sr-only">Files</span>
+                        <span className="sr-only">{t("printer.files")}</span>
                       </th>
                     </tr>
                   </thead>
@@ -197,7 +200,7 @@ export function PrinterView() {
                         <td className="muted">{duration(j.stats.seconds)}</td>
                         <td>
                           <span className={`badge ${j.status === "error" ? "red" : j.status === "done" ? "green" : ""}`}>
-                            {j.status === "error" ? "Failed" : j.status === "running" ? "Working" : j.send ? "Sent" : "Sliced"}
+                            {j.status === "error" ? t("printer.failed") : j.status === "running" ? t("printer.working") : j.send ? t("printer.sent") : t("printer.sliced")}
                           </span>
                         </td>
                         <td style={{ textAlign: "right" }}>
@@ -215,7 +218,7 @@ export function PrinterView() {
             )}
             {s?.history && s.history.length > 0 && (
               <>
-                <h2 style={{ marginTop: 8 }}>Printer history</h2>
+                <h2 style={{ marginTop: 8 }}>{t("printer.printerHistory")}</h2>
                 <div className="table-wrap">
                   <table style={{ minWidth: 420 }}>
                     <tbody>
@@ -224,7 +227,7 @@ export function PrinterView() {
                           <td>{h.filename}</td>
                           <td className="muted">{duration(h.print_duration)}</td>
                           <td>
-                            <span className={`badge ${h.status === "completed" ? "green" : h.status === "cancelled" || h.status === "error" ? "red" : ""}`}>{h.status}</span>
+                            <span className={`badge ${h.status === "completed" ? "green" : h.status === "cancelled" || h.status === "error" ? "red" : ""}`}>{historyStatusLabel(h.status)}</span>
                           </td>
                         </tr>
                       ))}
@@ -239,15 +242,15 @@ export function PrinterView() {
         <aside className="col-side">
           {s && (
             <section className="panel" style={{ order: 3 }}>
-              <h2>Toolheads</h2>
-              {s.tools.map((t) => (
-                <ToolRow key={t.index} tool={t} disabled={!!pending} onSet={(value) => act({ action: "nozzle", tool: t.index, value })} />
+              <h2>{t("printer.toolheads")}</h2>
+              {s.tools.map((tool) => (
+                <ToolRow key={tool.index} tool={tool} disabled={!!pending} onSet={(value) => act({ action: "nozzle", tool: tool.index, value })} />
               ))}
               <div className="tool">
                 <span className="tool-chip" style={{ background: "#F1F2F4" }}>
-                  Bed
+                  {t("printer.bed")}
                 </span>
-                <span style={{ flex: 1, fontWeight: 600, fontSize: 14 }}>Heated bed</span>
+                <span style={{ flex: 1, fontWeight: 600, fontSize: 14 }}>{t("printer.heatedBed")}</span>
                 <span className="temp">
                   {Math.round(s.bed.temp)} / {Math.round(s.bed.target)} °C
                 </span>
@@ -257,11 +260,11 @@ export function PrinterView() {
 
           {s && (
             <section className="panel" style={{ order: 4 }}>
-              <h2>Live adjustments</h2>
-              <Slider label="Print speed" unit="%" min={50} max={200} step={10} value={Math.round(s.speedFactor * 100)} onCommit={(v) => act({ action: "speed", value: v })} />
-              <Slider label="Part cooling fan" unit="%" min={0} max={100} step={10} value={Math.round(s.fanSpeed * 100)} onCommit={(v) => act({ action: "fan", value: v })} />
+              <h2>{t("printer.liveAdjustments")}</h2>
+              <Slider label={t("printer.printSpeed")} unit="%" min={50} max={200} step={10} value={Math.round(s.speedFactor * 100)} onCommit={(v) => act({ action: "speed", value: v })} />
+              <Slider label={t("printer.partCoolingFan")} unit="%" min={0} max={100} step={10} value={Math.round(s.fanSpeed * 100)} onCommit={(v) => act({ action: "fan", value: v })} />
               <label className="switch" style={{ justifyContent: "space-between", fontWeight: 500 }}>
-                Chamber light
+                {t("printer.chamberLight")}
                 <input type="checkbox" role="switch" checked={s.light} onChange={(e) => act({ action: "light", on: e.target.checked })} />
               </label>
             </section>
@@ -269,20 +272,20 @@ export function PrinterView() {
 
           {s && (
             <section className="panel" style={{ order: 5 }}>
-              <h2>Machine</h2>
-              <p className="small muted">{printing ? "Disabled while a print is running." : "Quick actions while the printer is idle."}</p>
+              <h2>{t("printer.machine")}</h2>
+              <p className="small muted">{printing ? t("printer.disabledWhilePrinting") : t("printer.quickActions")}</p>
               <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 8 }}>
                 <button className="btn" disabled={printing || !!pending} onClick={() => act({ action: "home" })}>
-                  Home all axes
+                  {t("printer.homeAllAxes")}
                 </button>
                 <button className="btn" disabled={printing || !!pending} onClick={() => act({ action: "bed", value: 60 })}>
-                  Preheat bed 60°
+                  {t("printer.preheatBed")}
                 </button>
                 <button className="btn" disabled={printing || !!pending} onClick={() => act({ action: "nozzle", tool: 0, value: 220 })}>
-                  Preheat T1 220°
+                  {t("printer.preheatNozzle")}
                 </button>
                 <button className="btn" disabled={printing || !!pending} onClick={() => act({ action: "cooldown" })}>
-                  Cool down
+                  {t("printer.cooldown")}
                 </button>
               </div>
             </section>
@@ -294,8 +297,12 @@ export function PrinterView() {
 }
 
 function stateLabel(state: string, klippy: string) {
-  if (klippy && klippy !== "ready") return `Firmware ${klippy}`;
-  return { printing: "Printing", paused: "Paused", complete: "Finished", cancelled: "Cancelled", error: "Error", standby: "Ready" }[state] ?? state;
+  if (klippy && klippy !== "ready") return t("printer.firmware", { state: klippy });
+  return { printing: t("printer.printing"), paused: t("printer.paused"), complete: t("printer.finished"), cancelled: t("printer.cancelled"), error: t("printer.error"), standby: t("printer.ready") }[state] ?? state;
+}
+
+function historyStatusLabel(status: string) {
+  return { completed: t("printer.statusCompleted"), cancelled: t("printer.statusCancelled"), error: t("printer.statusError") }[status] ?? status;
 }
 
 /** On/off for the printer's plug. Off is blocked while printing; the server refuses it too. */
@@ -317,22 +324,22 @@ function PowerButton({
         className="btn"
         disabled={printing || !!pending}
         onClick={() => onSwitch(false)}
-        title={printing ? "Not while a print is running" : `Turn off ${power.name ?? "the plug"} in Home Assistant`}
+        title={printing ? t("printer.notWhilePrinting") : t("printer.turnOffPlugTitle", { name: power.name ?? "Home Assistant" })}
       >
-        <PowerIcon size={18} /> {pending === "power" ? "Turning off…" : "Turn off"}
+        <PowerIcon size={18} /> {pending === "power" ? t("printer.turningOff") : t("printer.turnOff")}
       </button>
     );
   }
   if (power.state === "off") {
     return (
-      <button type="button" className="btn btn-primary" disabled={!!pending} onClick={() => onSwitch(true)} title={`Turn on ${power.name ?? "the plug"} in Home Assistant`}>
-        <PowerIcon size={18} /> {pending === "power" ? "Turning on…" : "Turn on"}
+      <button type="button" className="btn btn-primary" disabled={!!pending} onClick={() => onSwitch(true)} title={t("printer.turnOnPlugTitle", { name: power.name ?? "Home Assistant" })}>
+        <PowerIcon size={18} /> {pending === "power" ? t("printer.turningOn") : t("printer.turnOn")}
       </button>
     );
   }
   return (
-    <button type="button" className="btn" disabled title={power.error ?? `The plug is ${power.state} in Home Assistant`}>
-      <PowerIcon size={18} /> Plug {power.error ? "unreachable" : power.state}
+    <button type="button" className="btn" disabled title={power.error ?? t("printer.plugUnavailableTitle", { state: power.state })}>
+      <PowerIcon size={18} /> {power.error ? t("printer.plugUnreachable") : t("printer.plugState", { state: power.state })}
     </button>
   );
 }
@@ -345,20 +352,24 @@ function ToolRow({ tool, onSet, disabled }: { tool: ToolState; onSet: (v: number
         T{tool.index + 1}
       </span>
       <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 2 }}>
-        <span style={{ fontSize: 14, fontWeight: 600 }}>{tool.filament.loaded ? `${tool.filament.vendor} ${tool.filament.type}`.trim() || "Filament" : "Empty"}</span>
-        <span className="small muted">{tool.active ? "Printing" : tool.state ? tool.state.toLowerCase() : "parked"}</span>
+        <span style={{ fontSize: 14, fontWeight: 600 }}>{tool.filament.loaded ? `${tool.filament.vendor} ${tool.filament.type}`.trim() || t("printer.filament") : t("printer.empty")}</span>
+        <span className="small muted">{tool.active ? t("printer.printing") : tool.state ? toolStateLabel(tool.state) : t("printer.parked")}</span>
       </div>
       <span className="temp">
         {Math.round(tool.temp)}
         {tool.target ? ` / ${Math.round(tool.target)}` : ""} °C
       </span>
       {tool.target > 0 && (
-        <button className="btn btn-sm" disabled={disabled} onClick={() => onSet(0)} aria-label={`Turn off heater T${tool.index + 1}`}>
-          Off
+        <button className="btn btn-sm" disabled={disabled} onClick={() => onSet(0)} aria-label={t("printer.heaterOff", { tool: tool.index + 1 })}>
+          {t("printer.turnOff")}
         </button>
       )}
     </div>
   );
+}
+
+function toolStateLabel(state: string) {
+  return { printing: t("printer.printing"), paused: t("printer.paused"), standby: t("printer.parked"), parked: t("printer.parked") }[state.toLowerCase()] ?? state.toLowerCase();
 }
 
 function Slider({ label, unit, min, max, step, value, onCommit }: { label: string; unit: string; min: number; max: number; step: number; value: number; onCommit: (v: number) => void }) {

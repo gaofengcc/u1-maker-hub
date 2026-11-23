@@ -1,6 +1,30 @@
-import zhCN from "@/messages/zh-CN";
+import base from "@/messages/zh-CN";
+import monitor from "@/messages/zh-CN.monitor";
+import misc from "@/messages/zh-CN.misc";
 
 type Vars = Record<string, string | number>;
+type Dict = { [key: string]: string | readonly string[] | Dict };
+
+/**
+ * 深合并多个词典片段。后者的同名键覆盖前者，嵌套对象递归合并。
+ * 拆成多个文件是为了让多个页面可以并行翻译而不互相覆盖同一个词典文件。
+ */
+function mergeDict(...parts: Dict[]): Dict {
+  const out: Dict = {};
+  for (const part of parts) {
+    for (const [key, value] of Object.entries(part ?? {})) {
+      const prev = out[key];
+      if (value && typeof value === "object" && !Array.isArray(value) && prev && typeof prev === "object" && !Array.isArray(prev)) {
+        out[key] = mergeDict(prev as Dict, value as Dict);
+      } else {
+        out[key] = value as string | readonly string[] | Dict;
+      }
+    }
+  }
+  return out;
+}
+
+const zhCN: Dict = mergeDict(base as Dict, monitor as Dict, misc as Dict);
 
 function lookup(key: string): unknown {
   return key.split(".").reduce<unknown>((value, part) => {

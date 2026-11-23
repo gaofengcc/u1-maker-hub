@@ -210,3 +210,18 @@ interface ModelSourceProvider { source: ModelSource; search(p: SearchParams): Pr
    `第 1 盘的颜色 1 和颜色 5 都会用 T1 打印，U1 一个喷头不能同时装两种料。请在打印设置里把其中一个改到别的喷头，或分成两次打印。`
 
 实施决定：模型页中国站链接的 `profileId` 使用设计返回的 `defaultInstanceId`；切片输入中的 `filamentTypes` 由 `readProject().filaments[].type` 提供，设置里的 `tools` 仍只表示喷头实际装载耗材和颜色/价格。
+
+## 11. 批次 1.2b-A 实施记录
+
+- 完成 `Explore.tsx`、`ModelCard.tsx`、`ModelView.tsx`、`PrintSetup.tsx`、`PrintOptions.tsx` 中文化；所有静态界面文案改为通过 `t("段.键")` 获取，灵感列表使用 `tList()`。
+- `src/messages/zh-CN.ts` 新增 `explore`、`model`、`print` 三段，共 170 个词条（含填充、支撑、层高、接缝、预设和任务进度说明）。
+- 保留模型标题、作者、耗材预设名、文件名、单位、T1–T4、G-code、3MF 等用户数据或技术字段；动态任务步骤和模型描述仍来自后端/用户数据。
+
+验收：
+
+1. `export PATH=~/node22/bin:$PATH && pnpm build` 通过，TypeScript 零错误；仅有 `src/lib/profiles.ts` 原有 2 条 Turbopack 动态文件访问 warning。
+2. `pnpm lint` 通过，无新增问题。
+3. 5 个组件 JSX 英文残留 grep 结果为空：`rg -nE '>[A-Z][A-Za-z ]{6,}<' src/components/Explore.tsx src/components/ModelCard.tsx src/components/ModelView.tsx src/components/PrintSetup.tsx src/components/PrintOptions.tsx`。
+4. 页面截图：`/tmp/cn_explore.png`（首页骨架屏，控件为中文）、`/tmp/cn_model.png`（按任务给定的 `mw-3006416` 地址停留在页面加载态，出现页面文件中的英文 Loading 文案）、`/tmp/cn_plate.png`（打印盘加载态）；另以实际路由 `/model/3006416?site=cn` 验证完整详情页，截图为 `/tmp/cn_model_numeric.png`，本批次文案已中文化。详情页仍显示 `FavoriteButton`（不在本批次范围）提供的 “Save for later”。
+
+实施决定：`sorts`/`periods` 仍由服务端传入英文标签，但组件按 key 使用本批次词典渲染中文；打印预设标签和说明同样按模式 key 在组件侧映射，未改动 `src/lib/**` 或页面文件。
