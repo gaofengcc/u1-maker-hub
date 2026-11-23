@@ -56,6 +56,33 @@ export async function readProject(file: string): Promise<ProjectInfo> {
   };
 }
 
+/** 返回指定盘实际引用到的模型耗材序号（1-based，去重并排序）。 */
+export async function plateFilaments(file: string, plate: number): Promise<number[]> {
+  const zip = await JSZip.loadAsync(fs.readFileSync(file));
+  const modelText = (await zip.file(MODEL_SETTINGS)?.async("string")) ?? "";
+  const blocks = modelText.match(/<plate>[\s\S]*?<\/plate>/g) ?? [];
+  if (!blocks.length) return [];
+  const objectFilaments = new Map<number, number>();
+  for (const object of modelText.match(/<object\b[\s\S]*?<\/object>/g) ?? []) {
+    const objectId = Number(/<object\b[^>]*\bid="(\d+)"/.exec(object)?.[1] ?? NaN);
+    const filament = Number(/<metadata\b[^>]*\bkey="extruder"[^>]*\bvalue="(\d+)"/.exec(object)?.[1] ?? NaN);
+    if (Number.isInteger(objectId) && objectId > 0 && Number.isInteger(filament) && filament > 0) objectFilaments.set(objectId, filament);
+  }
+  let selected = blocks;
+  if (plate > 0) {
+    const byId = blocks.find((block) => Number(/key="plater_id" value="(\d+)"/.exec(block)?.[1] ?? NaN) === plate);
+    selected = byId ? [byId] : blocks[plate - 1] ? [blocks[plate - 1]] : [];
+  }
+  const used = new Set<number>();
+  for (const block of selected) {
+    for (const match of block.matchAll(/<model_instance\b[\s\S]*?<metadata\b[^>]*\bkey="object_id"[^>]*\bvalue="(\d+)"[\s\S]*?<\/model_instance>/g)) {
+      const filament = objectFilaments.get(Number(match[1]));
+      if (filament) used.add(filament);
+    }
+  }
+  return [...used].sort((a, b) => a - b);
+}
+
 /**
  * Writes a copy of the project where the Bambu printer, process and filament
  * settings are replaced by a complete U1 configuration. Geometry, plates,

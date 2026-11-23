@@ -300,7 +300,7 @@ export async function getDesign(id: number, site?: SiteId): Promise<ModelDetail>
       createdAt: d.createTime ?? "",
       defaultInstanceId: d.defaultInstanceId,
       instances,
-      url: `${siteConfig(selectedSite).webBase}/en/models/${d.id}${d.slug ? `-${d.slug}` : ""}`,
+      url: `${siteConfig(selectedSite).webBase}/${selectedSite === "cn" ? "zh" : "en"}/models/${d.id}${d.slug ? `-${d.slug}` : ""}${selectedSite === "cn" ? `#profileId-${d.defaultInstanceId}` : ""}`,
     };
   });
 }

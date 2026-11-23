@@ -18,6 +18,7 @@ const result = await sliceForU1({
   options: DEFAULT_OPTIONS,
   tools,
   filamentToTool: Array.from({ length: slots }, (_, i) => i % 4),
+  filamentTypes: Array.from({ length: slots }, () => "PLA"),
   plate: Number(plateArg ?? 0),
 });
 console.log("seconds", (Date.now() - started) / 1000);

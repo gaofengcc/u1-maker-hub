@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { spawn } from "node:child_process";
-import { flattenPreset, SLICER_BIN, U1_MACHINE, type Preset } from "./profiles.ts";
+import { flattenPreset, materialOf, presetForMaterial, SLICER_BIN, U1_MACHINE, type Preset } from "./profiles.ts";
 import { replaceProjectSettings } from "./threemf.ts";
 import { isIdentity, NO_TRANSFORM, type PlateTransform } from "./geometry.ts";
 import { parseStl, stlTo3mf, writeTransformedStl } from "./stl.ts";
@@ -137,6 +137,8 @@ export type SliceRequest = {
   tools: ToolLoad[]; // length 4
   /** For each filament slot of the model (0-based), the U1 tool index (0..3). */
   filamentToTool: number[];
+  /** 模型每个耗材槽要求的材料类型（与 filamentToTool 同长度）。 */
+  filamentTypes: string[];
   plate?: number; // 0 = all plates
   /** Resize and rotate the plate as one piece. */
   transform?: PlateTransform;
@@ -182,8 +184,11 @@ export async function sliceForU1(req: SliceRequest): Promise<SliceResult> {
 
   const filamentPaths: string[] = [];
   for (let slot = 0; slot < slotCount; slot++) {
-    const tool = req.tools[req.filamentToTool[slot] ?? 0] ?? req.tools[0];
-    const filament = flattenPreset(tool.preset);
+    const tool = req.tools[req.filamentToTool[slot] ?? 0] ?? req.tools[0] ?? { preset: "Snapmaker PLA @U1", color: "#FFFFFF" };
+    const requested = materialOf(req.filamentTypes[slot] ?? "PLA");
+    const loaded = materialOf(tool?.preset ?? "");
+    const presetName = requested && requested === loaded ? tool.preset : presetForMaterial(requested ?? "PLA");
+    const filament = flattenPreset(presetName);
     filament.filament_colour = [tool.color];
     const file = path.join(presetDir, `filament_${slot + 1}.json`);
     fs.writeFileSync(file, JSON.stringify(filament, null, 2));
@@ -249,6 +254,10 @@ export async function sliceForU1(req: SliceRequest): Promise<SliceResult> {
     .sort();
   if (gcodeFiles.length === 0) {
     throw new Error(`The slicer produced no G-code.\n${log.slice(-30).join("\n")}`);
+  }
+  const reload = gcodeFiles.find((file) => /(^|\n)\s*M600\b/i.test(fs.readFileSync(file, "utf8")));
+  if (reload) {
+    throw new Error(`切片结果包含 M600 换料指令（${path.basename(reload)}）。U1 不支持打印中途换料，请为每种耗材分配不同喷头。`);
   }
   let layers: SliceResult["layers"];
   if (plan) {

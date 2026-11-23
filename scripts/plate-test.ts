@@ -18,6 +18,6 @@ const { files, copies } = await combineProjects(sources, path.join(workDir, "pla
 console.log(`${copies} objects on ${files.length} U1 plate(s)`);
 for (const [i, input] of files.entries()) {
   const started = Date.now();
-  const r = await sliceForU1({ input, workDir: path.join(workDir, `slice-${i + 1}`), mode: "fast", options: DEFAULT_OPTIONS, tools: [tool, tool, tool, tool], filamentToTool: [0, 1, 2, 3], plate: 1 });
+  const r = await sliceForU1({ input, workDir: path.join(workDir, `slice-${i + 1}`), mode: "fast", options: DEFAULT_OPTIONS, tools: [tool, tool, tool, tool], filamentToTool: [0, 1, 2, 3], filamentTypes: ["PLA", "PLA", "PLA", "PLA"], plate: 1 });
   console.log(`plate ${i + 1}: ${(Date.now() - started) / 1000}s`, r.gcodeFiles);
 }

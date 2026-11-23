@@ -3,7 +3,8 @@ import path from "node:path";
 import crypto from "node:crypto";
 import { JOB_DIR, readSettings } from "./store.ts";
 import { downloadInstance, MakerWorldError } from "./makerworld.ts";
-import { readProject } from "./threemf.ts";
+import { plateFilaments, readProject } from "./threemf.ts";
+import { materialOf, presetForMaterial } from "./profiles.ts";
 import { sliceForU1, type PrintMode, type PrintOptions } from "./slicer.ts";
 import type { PlateTransform } from "./geometry.ts";
 import type { PlateEntry } from "./plate.ts";
@@ -174,6 +175,7 @@ async function runJob(job: Job) {
     const settings = readSettings();
     let inputs: string[];
     let mapping: number[];
+    let filamentTypes: string[] = [];
     if (job.upload?.kind === "3mf") {
       // A project file: handled like a MakerWorld download, with its own filaments and plates.
       setStep(job, "download", "running");
@@ -182,8 +184,9 @@ async function runJob(job: Job) {
       setStep(job, "presets", "running");
       const project = await readProject(file);
       const slots = project.filaments.length;
+      filamentTypes = project.filaments.map((f) => f.type);
       mapping = Array.from({ length: slots }, (_, i) => clampTool(job.filamentToTool[i] ?? i % 4));
-      setStep(job, "presets", "done", `${project.printer || "3MF"} → Snapmaker U1 · ${slots} filament${slots > 1 ? "s" : ""}`);
+      setStep(job, "presets", "done", presetDetail(`${project.printer || "3MF"} → Snapmaker U1 · ${slots} filament${slots > 1 ? "s" : ""}`, filamentTypes, mapping, settings.tools));
       inputs = [file];
     } else if (job.upload) {
       // A plain mesh: one filament, already in millimetres. The slicer step places it on the bed.
@@ -192,7 +195,8 @@ async function runJob(job: Job) {
       setStep(job, "download", "done", `${job.upload.name}.stl`);
       setStep(job, "presets", "running");
       mapping = [clampTool(job.filamentToTool[0] ?? 0)];
-      setStep(job, "presets", "done", "STL → Snapmaker U1 · 1 filament");
+      filamentTypes = ["PLA"];
+      setStep(job, "presets", "done", presetDetail("STL → Snapmaker U1 · 1 filament", filamentTypes, mapping, settings.tools));
     } else if (job.items?.length) {
       // Several models: download each, then merge them into one project per U1 plate where filament N is toolhead N.
       setStep(job, "download", "running");
@@ -218,6 +222,7 @@ async function runJob(job: Job) {
       );
       inputs = placed.files;
       mapping = [0, 1, 2, 3];
+      filamentTypes = ["PLA", "PLA", "PLA", "PLA"];
       const where = inputs.length > 1 ? `${inputs.length} plates` : "one plate";
       setStep(job, "presets", "done", `${placed.copies} object${placed.copies > 1 ? "s" : ""} on ${where} · T1–T4`);
     } else {
@@ -228,8 +233,9 @@ async function runJob(job: Job) {
       setStep(job, "presets", "running");
       const project = await readProject(download.file);
       const slots = project.filaments.length;
+      filamentTypes = project.filaments.map((f) => f.type);
       mapping = Array.from({ length: slots }, (_, i) => clampTool(job.filamentToTool[i] ?? i % 4));
-      setStep(job, "presets", "done", `${project.printer || "Bambu"} → Snapmaker U1 · ${slots} filament${slots > 1 ? "s" : ""}`);
+      setStep(job, "presets", "done", presetDetail(`${project.printer || "Bambu"} → Snapmaker U1 · ${slots} filament${slots > 1 ? "s" : ""}`, filamentTypes, mapping, settings.tools));
       inputs = [download.file];
     }
     job.filamentToTool = mapping;
@@ -244,6 +250,8 @@ async function runJob(job: Job) {
     const adaptive: NonNullable<Awaited<ReturnType<typeof sliceForU1>>["layers"]>[] = [];
     for (const [i, input] of inputs.entries()) {
       if (inputs.length > 1) setStep(job, "slice", "running", `Plate ${i + 1} of ${inputs.length}`);
+      const used = await plateFilaments(input, job.items?.length ? 1 : job.plate);
+      checkToolConflicts(used, mapping, i + 1);
       const result = await sliceForU1({
         input,
         workDir: path.join(dir, inputs.length > 1 ? `slice-${i + 1}` : "slice"),
@@ -251,6 +259,7 @@ async function runJob(job: Job) {
         options: job.options,
         tools: settings.tools,
         filamentToTool: mapping,
+        filamentTypes,
         plate: job.items?.length ? 1 : job.plate,
         transform: job.transform,
         onLog,
@@ -317,6 +326,33 @@ async function runSend(job: Job, plate: number) {
 
 function clampTool(n: number) {
   return Math.max(0, Math.min(3, Math.round(n)));
+}
+
+function presetDetail(base: string, filamentTypes: string[], mapping: number[], tools: { preset: string }[]) {
+  const notes: string[] = [];
+  for (let i = 0; i < filamentTypes.length; i++) {
+    const requested = materialOf(filamentTypes[i]);
+    const loaded = materialOf(tools[mapping[i] ?? 0]?.preset ?? "");
+    if (!requested) {
+      notes.push(`槽${i + 1} ${filamentTypes[i]} → Snapmaker PLA @U1（找不到匹配材料，已回退）`);
+    } else if (requested !== loaded) {
+      notes.push(`槽${i + 1} ${filamentTypes[i]} → ${presetForMaterial(requested)}（喷头装的是 ${loaded ?? "未知材料"}）`);
+    }
+  }
+  return notes.length ? `${base} · ${notes.join("；")}` : base;
+}
+
+function checkToolConflicts(used: number[], mapping: number[], plate: number) {
+  for (let i = 0; i < used.length; i++) {
+    for (let j = i + 1; j < used.length; j++) {
+      const first = used[i];
+      const second = used[j];
+      if ((mapping[first - 1] ?? 0) === (mapping[second - 1] ?? 0)) {
+        const tool = (mapping[first - 1] ?? 0) + 1;
+        throw new Error(`第 ${plate} 盘的颜色 ${first} 和颜色 ${second} 都会用 T${tool} 打印，U1 一个喷头不能同时装两种料。请在打印设置里把其中一个改到别的喷头，或分成两次打印。`);
+      }
+    }
+  }
 }
 
 function sumStats(list: JobStats[]): JobStats {

@@ -191,3 +191,22 @@ interface ModelSourceProvider { source: ModelSource; search(p: SearchParams): Pr
 2. 站点按钮原用 `aria-checked`，但 `globals.css` 只定义 `.chip[aria-pressed="true"]`，选中态不可见 → 改用 `aria-pressed` + `role="group"`，与 Explore 的排序按钮一致。
 
 验收：`pnpm build` rc=0、`pnpm lint` rc=0；`/settings` 200 且无英文残留（仅用户名）；headless Chrome 截图确认站点选中态、全中文、无布局错乱；`PUT /api/settings {site}` 双站切换正常且登录态互不影响。
+
+## 10. 批次 1.3 实施记录
+
+- `profiles.ts` 新增 `materialOf()` 与 `presetForMaterial()`：按模型耗材类别选择 U1 预设；喷头已装材料类别一致时沿用喷头预设，否则使用对应 U1 默认预设并在 job 的“预设”步骤写出替换说明。
+- `slicer.ts` 的 `SliceRequest` 增加 `filamentTypes`；切片后扫描 G-code，发现 `M600` 换料指令即失败。
+- `threemf.ts` 新增 `plateFilaments()`，通过盘内 `model_instance/object_id` 和对象 `extruder` 精确得到本盘耗材集合；`jobs.ts` 在每盘切片前检查多个逻辑耗材是否复用同一 U1 喷头。
+- `makerworld.ts` 中国站模型链接改为 `/zh/models/<id>-<slug>#profileId-<instanceId>`，国际站仍为 `/en/models/<id>-<slug>`。
+
+验收：
+
+1. `export PATH=~/node22/bin:$PATH && pnpm build` 通过，TypeScript 零错误；仍只有 `profiles.ts` 原有动态文件访问的 2 条 Turbopack warning。
+2. `pnpm lint` 通过，无新增问题。
+3. 真实模型 `designId=3006416 / instanceId=3531155`（中国站，第 1 盘）切片完成；G-code 原文为：
+   `; filament_settings_id = "Snapmaker TPU @U1";"Snapmaker PETG @U1";"Snapmaker PETG @U1";"Snapmaker PETG @U1";"Snapmaker TPU @U1"`
+   job 步骤同时记录了槽 1/5 TPU、槽 2–4 PETG 从喷头 PLA 预设替换的中文明细。
+4. 冲突检测验收：临时让第 1 盘同时引用颜色 1、4、5，并提交 `filamentToTool=[0,1,2,3,0]`；job 在切片前失败，错误原文为：
+   `第 1 盘的颜色 1 和颜色 5 都会用 T1 打印，U1 一个喷头不能同时装两种料。请在打印设置里把其中一个改到别的喷头，或分成两次打印。`
+
+实施决定：模型页中国站链接的 `profileId` 使用设计返回的 `defaultInstanceId`；切片输入中的 `filamentTypes` 由 `readProject().filaments[].type` 提供，设置里的 `tools` 仍只表示喷头实际装载耗材和颜色/价格。

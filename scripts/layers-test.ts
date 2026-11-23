@@ -22,6 +22,7 @@ const result = await sliceForU1({
   options,
   tools: [tool, { ...tool, color: "#000000" }, { ...tool, color: "#C62D2D" }, { ...tool, color: "#1C8C8C" }],
   filamentToTool: Array.from({ length: slots }, (_, i) => i % 4),
+  filamentTypes: Array.from({ length: slots }, () => "PLA"),
   plate: Number(plateArg ?? 0),
   transform: { scale: Number(sizeArg ?? 100) / 100, rotation: 0, orient: tipArg === "side" ? tilt("y", 90) : undefined },
   onLog: (line) => {

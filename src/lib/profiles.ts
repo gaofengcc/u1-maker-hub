@@ -19,6 +19,30 @@ const VENDOR_DIRS = ["Snapmaker", "OrcaFilamentLibrary"];
 type Kind = "machine" | "process" | "filament";
 export type Preset = Record<string, unknown> & { name: string; type?: string; inherits?: string };
 
+/** 从预设名或模型耗材类型中提取 U1 支持的材料类别。 */
+export function materialOf(presetOrType: string): string | null {
+  const value = String(presetOrType ?? "").toUpperCase();
+  // PA 先于 PLA 检查，避免复合材料名称被更宽泛的规则误判。
+  for (const material of ["PETG", "TPU", "PVA", "ABS", "ASA", "PA", "PLA"]) {
+    if (new RegExp(`(?:^|[^A-Z])${material}(?:$|[^A-Z])`).test(value)) return material;
+  }
+  return null;
+}
+
+/** 将模型材料类别映射到 U1 随附的默认耗材预设。 */
+export function presetForMaterial(material: string): string {
+  switch (materialOf(material) ?? String(material ?? "").toUpperCase()) {
+    case "PETG": return "Snapmaker PETG @U1";
+    case "TPU": return "Snapmaker TPU @U1";
+    case "ABS": return "Snapmaker ABS @U1";
+    case "ASA": return "Snapmaker ASA @U1";
+    case "PA": return "Snapmaker PA-CF @U1";
+    case "PVA": return "Snapmaker PLA @U1";
+    case "PLA": return "Snapmaker PLA @U1";
+    default: return "Snapmaker PLA @U1";
+  }
+}
+
 let presetIndex: Map<string, { kind: Kind; data: Preset }> | null = null;
 
 function loadIndex() {
