@@ -1,0 +1,32 @@
+# U1 Maker Hub with OrcaSlicer bundled.
+#   docker compose up -d --build      then open http://<host>:3000
+# See "Docker" in the README for resource sizing.
+services:
+  u1-maker-hub:
+    build:
+      context: .
+      args:
+        ORCA_VERSION: "2.4.2"
+    image: u1-maker-hub:latest
+    platform: linux/amd64 # OrcaSlicer only ships x86_64 Linux builds
+    container_name: u1-maker-hub
+    restart: unless-stopped
+    init: true # reaps the OrcaSlicer processes and forwards signals
+    ports:
+      - "3000:3000"
+    volumes:
+      - u1-data:/data
+    environment:
+      TZ: UTC
+    deploy:
+      resources:
+        limits:
+          cpus: "2"
+          memory: 3g # a large model on Fine detail peaks around 2.7 GB while slicing
+        reservations:
+          memory: 1g
+    memswap_limit: 3584m # 512 MB of swap on top of the 3 GB limit
+    stop_grace_period: 30s
+
+volumes:
+  u1-data:

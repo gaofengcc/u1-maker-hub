@@ -1,0 +1,12 @@
+.git
+.next
+node_modules
+data
+deploy
+docs
+*.tsbuildinfo
+next-env.d.ts
+.env*
+.DS_Store
+Dockerfile
+docker-compose.yml

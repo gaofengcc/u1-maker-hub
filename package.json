@@ -1,0 +1,32 @@
+{
+  "name": "u1-maker-hub",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint",
+    "mock-printer": "node scripts/mock-u1.mjs 7125",
+    "check-profiles": "node --experimental-strip-types scripts/check-profiles.ts"
+  },
+  "dependencies": {
+    "jszip": "^3.10.2",
+    "next": "16.4.5",
+    "react": "19.3.0",
+    "react-dom": "19.3.0",
+    "sanitize-html": "^2.18.1",
+    "three": "0.170.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "@types/sanitize-html": "^2.16.2",
+    "@types/three": "0.170.0",
+    "eslint": "^9",
+    "eslint-config-next": "16.4.5",
+    "typescript": "^5"
+  },
+  "packageManager": "pnpm@8.7.4"
+}

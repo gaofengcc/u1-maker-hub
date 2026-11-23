@@ -1,0 +1,382 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Model and U1 presets</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#F5F6F7}
+a{color:#0B7A45;text-decoration:none}a:hover{color:#075C33}
+</style>
+</helmet>
+<div style="font-family: Inter, system-ui, sans-serif; color: #111827; min-height: 100vh; background: #F5F6F7">
+
+  <header style="background: #FFFFFF; border-bottom: 1px solid #E5E7EB">
+    <div style="max-width: 1360px; margin: 0 auto; padding: 12px 24px; display: flex; flex-wrap: wrap; align-items: center; gap: 16px">
+      <a href="Main.dc.html" style="display: flex; align-items: center; gap: 10px; color: #111827">
+        <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="{{accent}}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2 3 7v10l9 5 9-5V7z"></path><path d="m3 7 9 5 9-5"></path><path d="M12 12v10"></path></svg>
+        <span style="font-weight: 700; font-size: 18px">U1 Maker Hub</span>
+      </a>
+      <span style="flex: 1"></span>
+      <nav style="display: flex; gap: 4px" aria-label="Main">
+        <a href="Main.dc.html" style="padding: 10px 14px; border-radius: 8px; font-weight: 500; color: #4B5563">Explore</a>
+        <a href="Printer.dc.html" style="padding: 10px 14px; border-radius: 8px; font-weight: 500; color: #4B5563">My printer</a>
+      </nav>
+    </div>
+  </header>
+
+  <main style="max-width: 1360px; margin: 0 auto; padding: 20px 24px 40px">
+    <nav aria-label="Breadcrumb" style="font-size: 14px; color: #4B5563; margin-bottom: 16px; display: flex; gap: 8px; flex-wrap: wrap">
+      <a href="Main.dc.html">Explore</a><span aria-hidden="true">/</span><span>Toys &amp; Games</span><span aria-hidden="true">/</span><span style="color: #111827">Articulated Crystal Dragon</span>
+    </nav>
+
+    <div style="display: flex; flex-wrap: wrap; gap: 24px; align-items: flex-start">
+
+      <section style="flex: 999 1 560px; min-width: 0; display: flex; flex-direction: column; gap: 16px">
+        <div style="background: #E8F5EE; border-radius: 16px; aspect-ratio: 16 / 10; display: flex; align-items: center; justify-content: center; position: relative">
+          <svg width="140" height="140" viewBox="0 0 24 24" fill="none" stroke="#0B7A45" stroke-width="1" stroke-linecap="round" stroke-linejoin="round" role="img" aria-label="Model preview placeholder"><path d="M12 2 3 7v10l9 5 9-5V7z"></path><path d="m3 7 9 5 9-5"></path><path d="M12 12v10"></path></svg>
+          <span style="position: absolute; bottom: 14px; left: 14px; font-size: 12px; font-weight: 600; background: rgba(255,255,255,.92); padding: 6px 10px; border-radius: 999px">Plate 1 of 2 · MakerWorld images</span>
+        </div>
+        <div style="display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 10px">
+          <div style="aspect-ratio: 1; border-radius: 10px; background: #E8F5EE; border: 2px solid #0B7A45"></div>
+          <div style="aspect-ratio: 1; border-radius: 10px; background: #EAF1FD"></div>
+          <div style="aspect-ratio: 1; border-radius: 10px; background: #FDF0E6"></div>
+          <div style="aspect-ratio: 1; border-radius: 10px; background: #F3EEFB"></div>
+          <div style="aspect-ratio: 1; border-radius: 10px; background: #EEF2F3"></div>
+        </div>
+
+        <div style="background: #FFFFFF; border: 1px solid #ECEEF0; border-radius: 14px; padding: 20px">
+          <h2 style="margin: 0 0 4px; font-size: 18px">Preset swap: original vs Snapmaker U1</h2>
+          <p style="margin: 0 0 16px; font-size: 14px; color: #4B5563">The 3MF keeps its geometry, plates and color painting. Printer, process and filament settings are replaced with your U1 presets, then the file is re-sliced.</p>
+          <div style="overflow-x: auto">
+            <table style="width: 100%; border-collapse: collapse; font-size: 14px; min-width: 520px">
+              <thead>
+                <tr style="text-align: left; color: #4B5563">
+                  <th scope="col" style="padding: 10px 8px; border-bottom: 1px solid #E5E7EB; font-weight: 600">Setting</th>
+                  <th scope="col" style="padding: 10px 8px; border-bottom: 1px solid #E5E7EB; font-weight: 600">From MakerWorld (Bambu X1C)</th>
+                  <th scope="col" style="padding: 10px 8px; border-bottom: 1px solid #E5E7EB; font-weight: 600">U1 · {{modeName}}</th>
+                </tr>
+              </thead>
+              <tbody>
+                <sc-for list="{{rows}}" as="r" hint-placeholder-count="10">
+                  <tr>
+                    <th scope="row" style="padding: 10px 8px; border-bottom: 1px solid #F1F2F4; font-weight: 500; text-align: left">{{r.k}}</th>
+                    <td style="padding: 10px 8px; border-bottom: 1px solid #F1F2F4; color: #6B7280; text-decoration: line-through">{{r.a}}</td>
+                    <td style="padding: 10px 8px; border-bottom: 1px solid #F1F2F4; font-weight: 600; color: #0B5C35">{{r.b}}</td>
+                  </tr>
+                </sc-for>
+              </tbody>
+            </table>
+          </div>
+          <p style="margin: 12px 0 0; font-size: 12px; color: #6B7280">Standard and Fine detail use the official Snapmaker Orca v2.4.1 U1 profiles. Fast &amp; clean adds the community anti-VFA wall tuning. Time and weight are sample estimates.</p>
+        </div>
+
+        <div style="background: #FFFFFF; border: 1px solid #ECEEF0; border-radius: 14px; padding: 20px; display: flex; flex-direction: column">
+          <div style="display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-start; gap: 12px; margin-bottom: 8px">
+            <div style="flex: 1 1 360px; min-width: 0; display: flex; flex-direction: column; gap: 4px">
+              <h2 style="margin: 0; font-size: 18px">Fine-tune this print</h2>
+              <p style="margin: 0; font-size: 14px; color: #4B5563; line-height: 1.5">The settings people change most often, explained in plain words. Not sure? Leave them as they are: the preset is already a good default.</p>
+            </div>
+            <div style="display: flex; align-items: center; gap: 10px">
+              <span style="font-size: 13px; color: #4B5563">{{changedLabel}}</span>
+              <button onClick="{{resetOpts}}" style="height: 40px; padding: 0 14px; border: 1px solid #D1D5DB; border-radius: 10px; background: #FFFFFF; font: inherit; font-size: 14px; font-weight: 600; cursor: pointer">Reset to preset</button>
+            </div>
+          </div>
+
+          <div style="display: flex; flex-wrap: wrap; gap: 12px 24px; align-items: center; padding: 16px 0; border-top: 1px solid #F1F2F4">
+            <div style="flex: 1 1 340px; min-width: 0; display: flex; flex-direction: column; gap: 4px">
+              <span style="display: flex; align-items: center; gap: 8px; font-size: 15px; font-weight: 600">Infill density <span style="font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 999px; background: #EAF1FD; color: #1F4FA0">Strength</span></span>
+              <span style="font-size: 14px; color: #374151; line-height: 1.5">How full the inside of the object is. Prints are not solid: inside there is a light mesh. 0% is hollow, 100% is solid plastic.</span>
+              <span style="font-size: 13px; color: #4B5563; line-height: 1.5">10 to 20% is plenty for decoration. Use 30 to 50% for parts that hold weight or get squeezed. Higher means slower and more filament.</span>
+            </div>
+            <label for="infill" style="flex: 1 1 260px; min-width: 0; display: flex; flex-direction: column; gap: 6px">
+              <span style="display: flex; justify-content: space-between; font-size: 14px"><span style="color: #4B5563">Hollow</span><span style="font-weight: 700; font-size: 16px">{{o.infill}}%</span><span style="color: #4B5563">Solid</span></span>
+              <input id="infill" type="range" min="0" max="100" step="5" value="{{o.infill}}" onInput="{{setInfill}}" style="accent-color: {{accent}}; height: 24px">
+            </label>
+          </div>
+
+          <div style="display: flex; flex-wrap: wrap; gap: 12px 24px; align-items: center; padding: 16px 0; border-top: 1px solid #F1F2F4">
+            <div style="flex: 1 1 340px; min-width: 0; display: flex; flex-direction: column; gap: 4px">
+              <span style="display: flex; align-items: center; gap: 8px; font-size: 15px; font-weight: 600">Infill pattern <span style="font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 999px; background: #EAF1FD; color: #1F4FA0">Strength</span></span>
+              <span style="font-size: 14px; color: #374151; line-height: 1.5">The shape of that inner mesh. You never see it once printed, but it changes how strong the part is and how fast it prints.</span>
+              <span style="font-size: 13px; color: #0B5C35; line-height: 1.5; font-weight: 500">{{patternHint}}</span>
+            </div>
+            <div style="flex: 1 1 260px; min-width: 0; display: flex; flex-direction: column; gap: 6px">
+              <label for="pattern" style="font-size: 13px; color: #4B5563">Pattern</label>
+              <select id="pattern" value="{{o.pattern}}" onChange="{{setPattern}}" style="height: 44px; border: 1px solid #D1D5DB; border-radius: 10px; padding: 0 12px; font: inherit; font-size: 15px; background: #FFFFFF">
+                <option value="gyroid">Gyroid (recommended)</option>
+                <option value="grid">Grid</option>
+                <option value="cubic">Cubic</option>
+                <option value="lightning">Lightning</option>
+                <option value="honeycomb">Honeycomb</option>
+              </select>
+            </div>
+          </div>
+
+          <div style="display: flex; flex-wrap: wrap; gap: 12px 24px; align-items: center; padding: 16px 0; border-top: 1px solid #F1F2F4">
+            <div style="flex: 1 1 340px; min-width: 0; display: flex; flex-direction: column; gap: 4px">
+              <span style="display: flex; align-items: center; gap: 8px; font-size: 15px; font-weight: 600">Wall loops <span style="font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 999px; background: #EAF1FD; color: #1F4FA0">Strength</span></span>
+              <span style="font-size: 14px; color: #374151; line-height: 1.5">How many lines make the outer skin of the object. More walls give a tougher shell.</span>
+              <span style="font-size: 13px; color: #4B5563; line-height: 1.5">2 is fine for most prints. Use 3 or 4 for parts that get screwed, clipped or dropped. This adds more strength than raising infill.</span>
+            </div>
+            <div role="radiogroup" aria-label="Wall loops" style="flex: 1 1 260px; min-width: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px">
+              <sc-for list="{{segWalls}}" as="s" hint-placeholder-count="3">
+                <button role="radio" aria-checked="{{s.on}}" onClick="{{s.pick}}" style="{{s.style}}">{{s.label}}</button>
+              </sc-for>
+            </div>
+          </div>
+
+          <div style="display: flex; flex-wrap: wrap; gap: 12px 24px; align-items: center; padding: 16px 0; border-top: 1px solid #F1F2F4">
+            <div style="flex: 1 1 340px; min-width: 0; display: flex; flex-direction: column; gap: 4px">
+              <span style="display: flex; align-items: center; gap: 8px; font-size: 15px; font-weight: 600">Supports <span style="font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 999px; background: #FDF0E6; color: #8A3B06">Print success</span></span>
+              <span style="font-size: 14px; color: #374151; line-height: 1.5">Temporary scaffolding printed under parts that hang in the air, like an outstretched arm. You snap it off after printing.</span>
+              <span style="font-size: 13px; color: #0B5C35; line-height: 1.5; font-weight: 500">{{supportHint}}</span>
+            </div>
+            <div role="radiogroup" aria-label="Supports" style="flex: 1 1 260px; min-width: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px">
+              <sc-for list="{{segSupports}}" as="s" hint-placeholder-count="3">
+                <button role="radio" aria-checked="{{s.on}}" onClick="{{s.pick}}" style="{{s.style}}">{{s.label}}</button>
+              </sc-for>
+            </div>
+          </div>
+
+          <div style="display: flex; flex-wrap: wrap; gap: 12px 24px; align-items: center; padding: 16px 0; border-top: 1px solid #F1F2F4">
+            <div style="flex: 1 1 340px; min-width: 0; display: flex; flex-direction: column; gap: 4px">
+              <span style="display: flex; align-items: center; gap: 8px; font-size: 15px; font-weight: 600">Brim <span style="font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 999px; background: #FDF0E6; color: #8A3B06">Print success</span></span>
+              <span style="font-size: 14px; color: #374151; line-height: 1.5">A thin flat border printed around the bottom of the object so it stays stuck to the plate. You peel it off afterwards.</span>
+              <span style="font-size: 13px; color: #4B5563; line-height: 1.5">Helps tall, thin or tiny objects that could come loose or tip over during printing.</span>
+            </div>
+            <div role="radiogroup" aria-label="Brim" style="flex: 1 1 260px; min-width: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px">
+              <sc-for list="{{segBrim}}" as="s" hint-placeholder-count="3">
+                <button role="radio" aria-checked="{{s.on}}" onClick="{{s.pick}}" style="{{s.style}}">{{s.label}}</button>
+              </sc-for>
+            </div>
+          </div>
+
+          <div style="display: flex; flex-wrap: wrap; gap: 12px 24px; align-items: center; padding: 16px 0; border-top: 1px solid #F1F2F4">
+            <div style="flex: 1 1 340px; min-width: 0; display: flex; flex-direction: column; gap: 4px">
+              <span style="display: flex; align-items: center; gap: 8px; font-size: 15px; font-weight: 600">Ironing <span style="font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 999px; background: #F3EEFB; color: #5A2E9E">Looks</span></span>
+              <span style="font-size: 14px; color: #374151; line-height: 1.5">After the last layer, the hot nozzle passes again over flat top surfaces, like an iron on a shirt. The top comes out smooth and shiny.</span>
+              <span style="font-size: 13px; color: #4B5563; line-height: 1.5">Only useful when the model has flat tops, like a box lid or a sign. Adds about 10 to 30% print time.</span>
+            </div>
+            <label style="flex: 1 1 260px; min-width: 0; display: flex; align-items: center; gap: 12px; min-height: 44px; cursor: pointer">
+              <input type="checkbox" role="switch" checked="{{o.ironing}}" onChange="{{toggleIroning}}" style="width: 22px; height: 22px; accent-color: {{accent}}">
+              <span style="font-size: 15px; font-weight: 600">{{ironingLabel}}</span>
+            </label>
+          </div>
+
+          <div style="display: flex; flex-wrap: wrap; gap: 12px 24px; align-items: center; padding: 16px 0; border-top: 1px solid #F1F2F4">
+            <div style="flex: 1 1 340px; min-width: 0; display: flex; flex-direction: column; gap: 4px">
+              <span style="display: flex; align-items: center; gap: 8px; font-size: 15px; font-weight: 600">Adaptive layer height <span style="font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 999px; background: #F3EEFB; color: #5A2E9E">Looks</span></span>
+              <span style="font-size: 14px; color: #374151; line-height: 1.5">The printer stacks thin layers on curved or sloped areas, where steps would show, and thicker layers on straight walls.</span>
+              <span style="font-size: 13px; color: #4B5563; line-height: 1.5">Smoother curves without slowing the whole print. Great for figurines and round shapes, little gain on boxy parts.</span>
+            </div>
+            <label style="flex: 1 1 260px; min-width: 0; display: flex; align-items: center; gap: 12px; min-height: 44px; cursor: pointer">
+              <input type="checkbox" role="switch" checked="{{o.adaptive}}" onChange="{{toggleAdaptive}}" style="width: 22px; height: 22px; accent-color: {{accent}}">
+              <span style="font-size: 15px; font-weight: 600">{{adaptiveLabel}}</span>
+            </label>
+          </div>
+
+          <div style="display: flex; flex-wrap: wrap; gap: 12px 24px; align-items: center; padding: 16px 0 0; border-top: 1px solid #F1F2F4">
+            <div style="flex: 1 1 340px; min-width: 0; display: flex; flex-direction: column; gap: 4px">
+              <span style="display: flex; align-items: center; gap: 8px; font-size: 15px; font-weight: 600">Seam position <span style="font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 999px; background: #F3EEFB; color: #5A2E9E">Looks</span></span>
+              <span style="font-size: 14px; color: #374151; line-height: 1.5">Each layer starts and ends at one point, which leaves a tiny visible bump called the seam. This chooses where those bumps go.</span>
+              <span style="font-size: 13px; color: #0B5C35; line-height: 1.5; font-weight: 500">{{seamHint}}</span>
+            </div>
+            <div style="flex: 1 1 260px; min-width: 0; display: flex; flex-direction: column; gap: 6px">
+              <label for="seam" style="font-size: 13px; color: #4B5563">Seam</label>
+              <select id="seam" value="{{o.seam}}" onChange="{{setSeam}}" style="height: 44px; border: 1px solid #D1D5DB; border-radius: 10px; padding: 0 12px; font: inherit; font-size: 15px; background: #FFFFFF">
+                <option value="aligned">Aligned (recommended)</option>
+                <option value="back">Back</option>
+                <option value="nearest">Nearest</option>
+                <option value="random">Random</option>
+              </select>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <aside style="flex: 1 1 380px; min-width: 0; display: flex; flex-direction: column; gap: 16px">
+        <div style="background: #FFFFFF; border: 1px solid #ECEEF0; border-radius: 14px; padding: 20px; display: flex; flex-direction: column; gap: 14px">
+          <h1 style="margin: 0; font-size: 24px; line-height: 1.25">Articulated Crystal Dragon</h1>
+          <div style="display: flex; align-items: center; gap: 10px; font-size: 14px; color: #4B5563">
+            <span style="width: 28px; height: 28px; border-radius: 999px; background: #0B7A45"></span>
+            <span>Sample creator A</span>
+            <span aria-hidden="true">·</span>
+            <span>Standard Digital File License</span>
+          </div>
+          <div style="display: flex; gap: 16px; font-size: 13px; color: #4B5563; flex-wrap: wrap">
+            <span>24.1k downloads</span><span>8.3k likes</span><span>2 plates</span><span>4 colors</span>
+          </div>
+        </div>
+
+        <div style="background: #FFFFFF; border: 1px solid #ECEEF0; border-radius: 14px; padding: 20px; display: flex; flex-direction: column; gap: 14px">
+          <h2 style="margin: 0; font-size: 16px">Print profile</h2>
+          <div role="radiogroup" aria-label="U1 preset" style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px">
+            <sc-for list="{{modes}}" as="m" hint-placeholder-count="3">
+              <button role="radio" aria-checked="{{m.on}}" onClick="{{m.pick}}" style="{{m.style}}">
+                <span style="font-weight: 700; font-size: 14px">{{m.name}}</span>
+                <span style="font-size: 12px; color: #4B5563">{{m.sub}}</span>
+              </button>
+            </sc-for>
+          </div>
+          <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; background: #F7F8F9; border-radius: 10px; padding: 12px">
+            <div style="display: flex; flex-direction: column; gap: 2px"><span style="font-size: 12px; color: #4B5563">Est. time</span><span style="font-size: 18px; font-weight: 700">{{est.time}}</span></div>
+            <div style="display: flex; flex-direction: column; gap: 2px"><span style="font-size: 12px; color: #4B5563">Filament</span><span style="font-size: 18px; font-weight: 700">{{est.grams}}</span></div>
+            <div style="display: flex; flex-direction: column; gap: 2px"><span style="font-size: 12px; color: #4B5563">Purge waste</span><span style="font-size: 18px; font-weight: 700">{{est.waste}}</span></div>
+          </div>
+
+          <h2 style="margin: 4px 0 0; font-size: 16px">Filament mapping</h2>
+          <p style="margin: 0; font-size: 13px; color: #4B5563">Model colors are matched to what is loaded in your U1 toolheads.</p>
+          <div style="display: flex; flex-direction: column; gap: 8px">
+            <sc-for list="{{maps}}" as="f" hint-placeholder-count="4">
+              <div style="display: flex; align-items: center; gap: 10px; font-size: 14px">
+                <span style="width: 22px; height: 22px; border-radius: 6px; background: {{f.c}}; border: 1px solid #D1D5DB; flex: none"></span>
+                <span style="flex: 1; min-width: 0">{{f.name}}</span>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#6B7280" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M5 12h14m-5-5 5 5-5 5"></path></svg>
+                <label style="position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0)" for="{{f.id}}">Toolhead for {{f.name}}</label>
+                <select id="{{f.id}}" style="height: 40px; border: 1px solid #D1D5DB; border-radius: 8px; padding: 0 10px; font: inherit; font-size: 14px; background: #FFFFFF">
+                  <option>{{f.tool}}</option><option>T1 · PLA White</option><option>T2 · PLA Black</option><option>T3 · PLA Red</option><option>T4 · PLA Teal</option>
+                </select>
+              </div>
+            </sc-for>
+          </div>
+        </div>
+
+        <div style="background: #FFFFFF; border: 1px solid #ECEEF0; border-radius: 14px; padding: 20px; display: flex; flex-direction: column; gap: 12px">
+          <button onClick="{{send}}" style="height: 52px; border: 0; border-radius: 12px; background: {{accent}}; color: #FFFFFF; font: inherit; font-weight: 700; font-size: 16px; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 10px">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m22 2-7 20-4-9-9-4z"></path><path d="M22 2 11 13"></path></svg>
+            Slice with U1 preset &amp; print
+          </button>
+          <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px">
+            <button style="height: 44px; border: 1px solid #D1D5DB; border-radius: 10px; background: #FFFFFF; font: inherit; font-weight: 600; cursor: pointer">Download U1 3MF</button>
+            <button style="height: 44px; border: 1px solid #D1D5DB; border-radius: 10px; background: #FFFFFF; font: inherit; font-weight: 600; cursor: pointer">Original 3MF</button>
+          </div>
+          <ol style="list-style: none; margin: 4px 0 0; padding: 0; display: flex; flex-direction: column; gap: 10px" aria-label="Send progress">
+            <sc-for list="{{steps}}" as="s" hint-placeholder-count="5">
+              <li style="display: flex; align-items: center; gap: 10px; font-size: 14px">
+                <span style="{{s.dot}}">{{s.mark}}</span>
+                <span style="flex: 1; color: {{s.color}}">{{s.label}}</span>
+                <span style="font-size: 12px; color: #6B7280">{{s.note}}</span>
+              </li>
+            </sc-for>
+          </ol>
+        </div>
+      </aside>
+    </div>
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"accent":{"editor":"color","default":"#0B7A45","options":["#0B7A45","#1F6FEB","#E8590C","#111827"]},"$preview":{"width":1440,"height":2400}}'>
+var OPT_DEFAULTS = { infill: 15, pattern: 'gyroid', walls: '2', supports: 'auto', brim: 'auto', ironing: false, adaptive: false, seam: 'aligned' };
+class Component extends DCLogic {
+  constructor(p){ super(p); this.state = { mode: 'fast', step: 0, o: Object.assign({}, OPT_DEFAULTS) }; this.timer = null; }
+  setOpt(k, v){ this.setState({ o: Object.assign({}, this.state.o, { [k]: v }) }); }
+  seg(key, opts, accent){
+    return opts.map((x) => {
+      const on = this.state.o[key] === x[0];
+      return { label: x[1], on: on ? 'true' : 'false', pick: () => this.setOpt(key, x[0]),
+        style: 'min-height: 44px; padding: 0 10px; border-radius: 10px; font: inherit; font-size: 14px; font-weight: 600; cursor: pointer; color: #111827; background: ' + (on ? '#E8F5EE' : '#FFFFFF') + '; border: 2px solid ' + (on ? accent : '#E5E7EB') };
+    });
+  }
+  componentWillUnmount(){ if (this.timer) clearInterval(this.timer); }
+  renderVals() {
+    const accent = this.props.accent ?? '#0B7A45';
+    const P = {
+      fast:    { name: 'Fast & clean', sub: '0.20 tuned', layer: '0.20 mm', walls: '2', infill: '15% gyroid', outer: '210 mm/s', inner: '210 mm/s', fill: '270 mm/s (flow cap 20 mm³/s)', accel: '10 000 / outer 5 000', temp: '220 °C / bed 65 °C', mins: 205, g: 86, waste: '9 g' },
+      balanced:{ name: 'Standard', sub: 'Official 0.20', layer: '0.20 mm', walls: '2', infill: '15% grid', outer: '200 mm/s', inner: '300 mm/s', fill: '270 mm/s (flow cap 15 mm³/s)', accel: '10 000 / outer 5 000', temp: '220 °C / bed 65 °C', mins: 230, g: 86, waste: '10 g' },
+      quality: { name: 'Fine detail', sub: 'Official 0.12', layer: '0.12 mm', walls: '3', infill: '15% grid', outer: '150 mm/s', inner: '200 mm/s', fill: '250 mm/s (flow cap 15 mm³/s)', accel: '10 000 / outer 5 000', temp: '220 °C / bed 65 °C', mins: 400, g: 89, waste: '12 g' }
+    };
+    const cur = P[this.state.mode];
+    const modes = ['fast','balanced','quality'].map((k) => {
+      const on = k === this.state.mode;
+      return { name: P[k].name, sub: P[k].sub, on: on ? 'true' : 'false', pick: () => this.setState({ mode: k }),
+        style: 'min-height: 56px; display: flex; flex-direction: column; align-items: flex-start; gap: 2px; padding: 10px 12px; border-radius: 10px; font: inherit; cursor: pointer; text-align: left; color: #111827; background: ' + (on ? '#E8F5EE' : '#FFFFFF') + '; border: 2px solid ' + (on ? accent : '#E5E7EB') };
+    });
+    const rows = [
+      { k: 'Printer', a: 'Bambu Lab X1 Carbon 0.4', b: 'Snapmaker U1 0.4 nozzle' },
+      { k: 'Layer height', a: '0.20 mm', b: cur.layer },
+      { k: 'Wall loops', a: '2', b: cur.walls },
+      { k: 'Sparse infill', a: '15% grid', b: cur.infill },
+      { k: 'Outer wall speed', a: '200 mm/s', b: cur.outer },
+      { k: 'Inner wall speed', a: '300 mm/s', b: cur.inner },
+      { k: 'Infill speed', a: '270 mm/s', b: cur.fill },
+      { k: 'Acceleration', a: '10 000 mm/s²', b: cur.accel },
+      { k: 'Nozzle / bed', a: '220 °C / 55 °C', b: cur.temp },
+      { k: 'Color change', a: 'AMS purge, prime tower', b: 'Toolhead swap, small prime tower' }
+    ];
+    const maps = [
+      { id: 'f1', c: '#F5F5F0', name: 'Model color 1 · White', tool: 'T1 · PLA White' },
+      { id: 'f2', c: '#1F2328', name: 'Model color 2 · Black', tool: 'T2 · PLA Black' },
+      { id: 'f3', c: '#C62D2D', name: 'Model color 3 · Red', tool: 'T3 · PLA Red' },
+      { id: 'f4', c: '#1C8C8C', name: 'Model color 4 · Teal', tool: 'T4 · PLA Teal' }
+    ];
+    const labels = [['Download 3MF from MakerWorld','2.4 MB'],['Swap in U1 presets','printer · process · filament'],['Re-slice with OrcaSlicer CLI','headless'],['Upload to U1','Moonraker · LAN'],['Start print','']];
+    const st = this.state.step;
+    const steps = labels.map((l, i) => {
+      const done = i < st, active = i === st && st > 0 && st <= labels.length;
+      return { label: l[0], note: l[1], mark: done ? '✓' : String(i + 1), color: done || active ? '#111827' : '#6B7280',
+        dot: 'width: 24px; height: 24px; border-radius: 999px; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; flex: none; ' + (done ? 'background: ' + accent + '; color: #FFFFFF' : active ? 'border: 2px solid ' + accent + '; color: ' + accent : 'background: #F1F2F4; color: #4B5563') };
+    });
+    const o = this.state.o;
+    const patternHints = {
+      gyroid: 'Gyroid: a wavy 3D mesh, strong in every direction and smooth to print. The best all-round choice.',
+      grid: 'Grid: simple crossing lines. Fast and strong from the top, a little weaker from the sides.',
+      cubic: 'Cubic: stacked cubes, strong in every direction. Good for functional parts.',
+      lightning: 'Lightning: only holds up the top surfaces, almost hollow. Fastest and lightest, but weak. Decoration only.',
+      honeycomb: 'Honeycomb: hexagons, very stiff but slower to print.'
+    };
+    const supportHints = {
+      off: 'Off: no scaffolding. Pick this when the creator says the model prints without supports.',
+      auto: 'Auto: tree-shaped supports added only where the model needs them. Easy to remove.',
+      plate: 'Plate only: supports only where they can stand on the plate, never on the model itself. Cleaner surfaces.'
+    };
+    const seamHints = {
+      aligned: 'Aligned: all bumps line up in one neat vertical line, usually on a corner.',
+      back: 'Back: the seam line is hidden at the back of the model.',
+      nearest: 'Nearest: fastest option, but bumps are scattered around the surface.',
+      random: 'Random: no visible line, but the whole surface is slightly rougher.'
+    };
+    let tf = 1 + (o.infill - 15) * 0.006;
+    tf += { gyroid: 0, grid: -0.03, cubic: 0.01, lightning: -0.1, honeycomb: 0.08 }[o.pattern];
+    tf += { '2': 0, '3': 0.06, '4': 0.12 }[o.walls];
+    tf += { off: -0.06, auto: 0, plate: -0.02 }[o.supports];
+    if (o.ironing) tf += 0.15;
+    if (o.adaptive) tf += 0.08;
+    const mins = Math.round(cur.mins * tf);
+    const grams = Math.round(cur.g + (o.infill - 15) * 0.9 + (Number(o.walls) - 2) * 6 + (o.pattern === 'lightning' ? -8 : 0));
+    const changed = Object.keys(OPT_DEFAULTS).filter((k) => o[k] !== OPT_DEFAULTS[k]).length;
+    return { accent, modes, rows, maps, steps, modeName: cur.name, o,
+      est: { time: Math.floor(mins / 60) + 'h ' + String(mins % 60).padStart(2, '0') + 'm', grams: grams + ' g', waste: cur.waste },
+      patternHint: patternHints[o.pattern], supportHint: supportHints[o.supports], seamHint: seamHints[o.seam],
+      segWalls: this.seg('walls', [['2','2 walls'],['3','3 walls'],['4','4 walls']], accent),
+      segSupports: this.seg('supports', [['off','Off'],['auto','Auto'],['plate','Plate only']], accent),
+      segBrim: this.seg('brim', [['none','None'],['auto','Auto'],['always','Always']], accent),
+      ironingLabel: o.ironing ? 'On: smooth tops' : 'Off',
+      adaptiveLabel: o.adaptive ? 'On: smoother curves' : 'Off',
+      changedLabel: changed === 0 ? 'Preset defaults' : changed + (changed === 1 ? ' setting changed' : ' settings changed'),
+      setInfill: (e) => this.setOpt('infill', Number(e.target.value)),
+      setPattern: (e) => this.setOpt('pattern', e.target.value),
+      setSeam: (e) => this.setOpt('seam', e.target.value),
+      toggleIroning: () => this.setOpt('ironing', !o.ironing),
+      toggleAdaptive: () => this.setOpt('adaptive', !o.adaptive),
+      resetOpts: () => this.setState({ o: Object.assign({}, OPT_DEFAULTS) }),
+      send: () => {
+        if (this.timer) clearInterval(this.timer);
+        this.setState({ step: 1 });
+        this.timer = setInterval(() => {
+          const n = this.state.step + 1;
+          this.setState({ step: n });
+          if (n > labels.length) { clearInterval(this.timer); this.timer = null; }
+        }, 700);
+      } };
+  }
+}
+</script>
+</body>
+</html>
