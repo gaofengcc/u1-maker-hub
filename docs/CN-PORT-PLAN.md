@@ -175,3 +175,19 @@ interface ModelSourceProvider { source: ModelSource; search(p: SearchParams): Pr
 4. `git status --short` 已检查，业务改动仅在本批次允许的服务端、类型、布局与本记录文件内；未修改 `src/components/**`、页面文件、`package.json`、`README.md`。
 
 与本文档要求不一致的决定：为避免 `src/lib/format.ts`（客户端模块）把 Node `fs` 引入浏览器 bundle，`sites.ts` 未直接导入 `store.ts`；改为由 store 初始化时设置进程内当前站点，`resolveSite()` 读取该设置并回落 `DEFAULT_SITE`。此外，为保持现有客户端构造 plate/favorite 的 TypeScript 兼容，`PlateEntry.site` 与 `Favorite.site` 在类型上可选，但所有服务端新写入记录都会补齐站点，旧记录按国际站读取。
+
+## 9. 批次 1.2a 实施记录（Settings 中文化 + 站点切换）
+
+- 新建 `src/lib/i18n.ts`（零依赖 `t()` / `tList()`，`{var}` 插值，无 React/Node 依赖，服务端与客户端共用）
+- 新建 `src/messages/zh-CN.ts`（中文词典）
+- `SettingsView.tsx` 全中文 + 站点选择（国际站/中国站）+ 按站点显示登录态，三种登录方式均带 `site`
+- `Header.tsx` 全中文 + 当前站点徽标（客户端 fetch `/api/settings`）
+- `format.ts` 增加中文日期/数字格式化
+
+术语：toolhead→喷头、filament→耗材、slice→切片、plate→打印盘、infill→填充、support→支撑、brim→裙边、seam→接缝、preset→预设。
+
+**实施说明（与原计划不一致处）**：
+1. codex 首次执行被中途中断，留下 4 处 `TS2349`（`tools.map((t, i)` 的参数遮蔽了 i18n 的 `t()`）与 1 处 `PublicSettings` 类型不匹配，由 Hermes 手工修正：map 参数改名 `tool`，`accounts` 放宽为 `Record<string, ...>`。
+2. 站点按钮原用 `aria-checked`，但 `globals.css` 只定义 `.chip[aria-pressed="true"]`，选中态不可见 → 改用 `aria-pressed` + `role="group"`，与 Explore 的排序按钮一致。
+
+验收：`pnpm build` rc=0、`pnpm lint` rc=0；`/settings` 200 且无英文残留（仅用户名）；headless Chrome 截图确认站点选中态、全中文、无布局错乱；`PUT /api/settings {site}` 双站切换正常且登录态互不影响。

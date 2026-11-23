@@ -2,11 +2,15 @@
 
 import { useState } from "react";
 import type { ToolLoad } from "@/lib/slicer.ts";
-import { api, DEFAULT_PRICE_PER_KG, inkFor, mwImage } from "@/lib/format";
+import { api, DEFAULT_PRICE_PER_KG, formatDate, inkFor, mwImage } from "@/lib/format";
+import { SITES, type SiteId } from "@/lib/sites";
+import { t, tList } from "@/lib/i18n";
 
 type PublicSettings = {
+  site: SiteId;
+  accounts: Record<string, { loggedIn: boolean; user: { uid?: string | number; name?: string; avatar?: string } | null; savedAt: string | null }>;
   loggedIn: boolean;
-  bambuUser: { name?: string; avatar?: string } | null;
+  bambuUser: { uid?: string | number; name?: string; avatar?: string } | null;
   tokenSavedAt: string | null;
   printerHost: string;
   haUrl: string;
@@ -21,7 +25,7 @@ export function SettingsView({ initial, filaments }: { initial: PublicSettings; 
   const [s, setS] = useState(initial);
   return (
     <main className="container" style={{ maxWidth: 900, display: "flex", flexDirection: "column", gap: 20 }}>
-      <h1 style={{ margin: 0, fontSize: 26 }}>Settings</h1>
+      <h1 style={{ margin: 0, fontSize: 26 }}>{t("settings.title")}</h1>
       <AccountPanel s={s} onChange={setS} />
       <PrinterPanel s={s} onChange={setS} />
       <PowerPanel s={s} onChange={setS} />
@@ -39,6 +43,17 @@ function AccountPanel({ s, onChange }: { s: PublicSettings; onChange: (s: Public
   const [step, setStep] = useState<LoginStep | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const account = s.accounts?.[s.site] ?? { loggedIn: s.loggedIn, user: s.bambuUser, savedAt: s.tokenSavedAt };
+
+  const switchSite = async (site: SiteId) => {
+    if (site === s.site) return;
+    setError(null);
+    try {
+      onChange(await api<PublicSettings>("/api/settings", { method: "PUT", body: JSON.stringify({ site }) }));
+    } catch (e) {
+      setError((e as Error).message);
+    }
+  };
 
   const refresh = async () => onChange(await api<PublicSettings>("/api/settings"));
 
@@ -63,22 +78,25 @@ function AccountPanel({ s, onChange }: { s: PublicSettings; onChange: (s: Public
     } else setStep(r);
   };
 
-  if (s.loggedIn) {
+  const authBody = (extra: Record<string, string>) => JSON.stringify({ ...extra, site: s.site });
+
+  if (account.loggedIn) {
     return (
       <section className="panel">
-        <h2>MakerWorld account</h2>
+        <h2>{t("settings.accountTitle")}</h2>
+        <SitePicker site={s.site} onChange={switchSite} />
+        <p className="small muted">{t("settings.siteDescription")}</p>
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          {s.bambuUser?.avatar && <img className="avatar" style={{ width: 40, height: 40 }} src={mwImage(s.bambuUser.avatar, 96)} alt="" referrerPolicy="no-referrer" />}
+          {account.user?.avatar && <img className="avatar" style={{ width: 40, height: 40 }} src={mwImage(account.user.avatar, 96)} alt="" referrerPolicy="no-referrer" />}
           <div style={{ flex: 1 }}>
-            <strong>{s.bambuUser?.name || "Logged in"}</strong>
+            <strong>{account.user?.name || t("settings.accountLoggedIn")}</strong>
             <p className="small muted">
-              Downloads are enabled. Bambu logins last about 90 days
-              {s.tokenSavedAt ? ` (saved ${new Date(s.tokenSavedAt).toLocaleDateString()})` : ""}.
+              {t("settings.downloadsEnabled")}{account.savedAt ? ` ${t("settings.savedAt", { date: formatDate(account.savedAt) })}` : "。"}
             </p>
           </div>
-          <button type="button" className="btn" onClick={() => run(async () => onChange(await api<PublicSettings>("/api/auth/token", { method: "DELETE" })))}>
-            Log out
+          <button type="button" className="btn" onClick={() => run(async () => onChange(await api<PublicSettings>(`/api/auth/token?site=${s.site}`, { method: "DELETE" })))}>
+            {t("settings.logout")}
           </button>
         </div>
       </section>
@@ -87,17 +105,17 @@ function AccountPanel({ s, onChange }: { s: PublicSettings; onChange: (s: Public
 
   return (
     <section className="panel">
-      <h2>MakerWorld account</h2>
+      <h2>{t("settings.accountTitle")}</h2>
+      <SitePicker site={s.site} onChange={switchSite} />
       <p className="small muted" style={{ lineHeight: 1.5 }}>
-        Browsing works without an account, but MakerWorld only lets logged-in users download files. Log in with your Bambu Lab account. Your credentials go only to
-        Bambu Lab; this app keeps just the resulting token, on this computer.
+        {t("settings.browseWithoutAccount")}
       </p>
-      <div className="chips" role="tablist" aria-label="Login method">
+      <div className="chips" role="tablist" aria-label={t("settings.loginMethod")}>
         {(
           [
-            ["password", "Email & password"],
-            ["code", "Email code"],
-            ["token", "Paste a token"],
+            ["password", t("settings.passwordTab")],
+            ["code", t("settings.codeTab")],
+            ["token", t("settings.tokenTab")],
           ] as const
         ).map(([k, label]) => (
           <button
@@ -122,16 +140,16 @@ function AccountPanel({ s, onChange }: { s: PublicSettings; onChange: (s: Public
           className="field"
           onSubmit={(e) => {
             e.preventDefault();
-            run(async () => handleStep(await api<LoginStep>("/api/auth/tfa", { method: "POST", body: JSON.stringify({ tfaKey: step.tfaKey, code }) })));
+            run(async () => handleStep(await api<LoginStep>("/api/auth/tfa", { method: "POST", body: authBody({ tfaKey: step.tfaKey, code }) })));
           }}
         >
           <label className="label" htmlFor="tfa">
-            Code from your authenticator app
+            {t("settings.authenticatorCode")}
           </label>
           <div style={{ display: "flex", gap: 8 }}>
             <input id="tfa" className="input" inputMode="numeric" autoComplete="one-time-code" value={code} onChange={(e) => setCode(e.target.value)} />
             <button className="btn btn-primary" disabled={busy}>
-              Verify
+              {t("settings.verify")}
             </button>
           </div>
         </form>
@@ -140,16 +158,16 @@ function AccountPanel({ s, onChange }: { s: PublicSettings; onChange: (s: Public
           className="field"
           onSubmit={(e) => {
             e.preventDefault();
-            run(async () => handleStep(await api<LoginStep>("/api/auth/login", { method: "POST", body: JSON.stringify({ email, code }) })));
+            run(async () => handleStep(await api<LoginStep>("/api/auth/login", { method: "POST", body: authBody({ email, code }) })));
           }}
         >
           <label className="label" htmlFor="code">
-            Bambu sent a code to {email}. Enter it here.
+            {t("settings.codeSent", { email })}
           </label>
           <div style={{ display: "flex", gap: 8 }}>
             <input id="code" className="input" inputMode="numeric" autoComplete="one-time-code" value={code} onChange={(e) => setCode(e.target.value)} />
             <button className="btn btn-primary" disabled={busy}>
-              Log in
+              {t("settings.login")}
             </button>
           </div>
         </form>
@@ -158,41 +176,41 @@ function AccountPanel({ s, onChange }: { s: PublicSettings; onChange: (s: Public
           style={{ display: "flex", flexDirection: "column", gap: 12 }}
           onSubmit={(e) => {
             e.preventDefault();
-            run(async () => handleStep(await api<LoginStep>("/api/auth/login", { method: "POST", body: JSON.stringify({ email, password }) })));
+            run(async () => handleStep(await api<LoginStep>("/api/auth/login", { method: "POST", body: authBody({ email, password }) })));
           }}
         >
           <div className="field">
             <label className="label" htmlFor="email">
-              Email
+              {t("settings.email")}
             </label>
             <input id="email" className="input" type="email" autoComplete="username" value={email} onChange={(e) => setEmail(e.target.value)} required />
           </div>
           <div className="field">
             <label className="label" htmlFor="password">
-              Password
+              {t("settings.password")}
             </label>
             <input id="password" className="input" type="password" autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} required />
           </div>
           <button className="btn btn-primary" disabled={busy} style={{ alignSelf: "flex-start" }}>
-            {busy ? "Logging in…" : "Log in"}
+            {busy ? t("settings.loggingIn") : t("settings.login")}
           </button>
-          <p className="small muted">If Bambu asks for a code sent by email or from an authenticator app, a field appears here.</p>
+          <p className="small muted">{t("settings.loginHint")}</p>
         </form>
       ) : tab === "code" ? (
         <form
           className="field"
           onSubmit={(e) => {
             e.preventDefault();
-            run(async () => setStep(await api<LoginStep>("/api/auth/code", { method: "POST", body: JSON.stringify({ email }) })));
+            run(async () => setStep(await api<LoginStep>("/api/auth/code", { method: "POST", body: authBody({ email }) })));
           }}
         >
           <label className="label" htmlFor="email2">
-            Email (for Google or Apple sign-in accounts too)
+            {t("settings.codeEmailHint")}
           </label>
           <div style={{ display: "flex", gap: 8 }}>
             <input id="email2" className="input" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
             <button className="btn btn-primary" disabled={busy}>
-              Send code
+              {t("settings.sendCode")}
             </button>
           </div>
         </form>
@@ -202,27 +220,38 @@ function AccountPanel({ s, onChange }: { s: PublicSettings; onChange: (s: Public
           onSubmit={(e) => {
             e.preventDefault();
             run(async () => {
-              onChange(await api<PublicSettings>("/api/auth/token", { method: "POST", body: JSON.stringify({ token }) }));
+              onChange(await api<PublicSettings>("/api/auth/token", { method: "POST", body: authBody({ token }) }));
               setToken("");
             });
           }}
         >
-          <ol className="small muted" style={{ margin: 0, paddingLeft: 18, lineHeight: 1.7 }}>
-            <li>Log in on makerworld.com in your browser.</li>
-            <li>Open the developer tools, then Application (Chrome) or Storage (Firefox), then Cookies, then makerworld.com.</li>
-            <li>Copy the value of the cookie named “token” and paste it below.</li>
-          </ol>
+          <ol className="small muted" style={{ margin: 0, paddingLeft: 18, lineHeight: 1.7 }}>{tList("settings.tokenInstructions").map((item) => <li key={item}>{item}</li>)}</ol>
           <label className="label" htmlFor="token">
-            Token
+            {t("settings.token")}
           </label>
           <textarea id="token" className="input" style={{ height: 90, padding: 10, fontFamily: "monospace", fontSize: 12 }} value={token} onChange={(e) => setToken(e.target.value)} />
           <button className="btn btn-primary" disabled={busy || !token.trim()} style={{ alignSelf: "flex-start" }}>
-            Save token
+            {t("settings.saveToken")}
           </button>
         </form>
       )}
       {error && <div className="notice error">{error}</div>}
     </section>
+  );
+}
+
+function SitePicker({ site, onChange }: { site: SiteId; onChange: (site: SiteId) => void }) {
+  return (
+    <div className="field" style={{ marginBottom: 12 }}>
+      <span className="label">{t("settings.siteTitle")}</span>
+      <div className="chips" role="group" aria-label={t("settings.siteTitle")}>
+        {(Object.keys(SITES) as SiteId[]).map((id) => (
+          <button key={id} type="button" className="chip" aria-pressed={site === id} onClick={() => onChange(id)}>
+            {SITES[id].label}
+          </button>
+        ))}
+      </div>
+    </div>
   );
 }
 
@@ -236,7 +265,7 @@ function PrinterPanel({ s, onChange }: { s: PublicSettings; onChange: (s: Public
     setResult(null);
     try {
       const r = await api<{ ok: boolean; error?: string; klippy?: string; version?: string }>("/api/printer/test", { method: "POST", body: JSON.stringify({ host }) });
-      setResult(r.ok ? { ok: true, text: `Connected. Firmware state: ${r.klippy}${r.version ? ` · Moonraker ${r.version}` : ""}.` } : { ok: false, text: r.error ?? "No answer." });
+      setResult(r.ok ? { ok: true, text: t("settings.connected", { state: r.klippy ?? "—", version: r.version ? ` · Moonraker ${r.version}` : "" }) } : { ok: false, text: r.error ?? t("settings.noAnswer") });
       if (r.ok) onChange(await api<PublicSettings>("/api/settings", { method: "PUT", body: JSON.stringify({ printerHost: host }) }));
     } catch (e) {
       setResult({ ok: false, text: (e as Error).message });
@@ -247,9 +276,9 @@ function PrinterPanel({ s, onChange }: { s: PublicSettings; onChange: (s: Public
 
   return (
     <section className="panel">
-      <h2>Printer</h2>
+      <h2>{t("settings.printerTitle")}</h2>
       <p className="small muted" style={{ lineHeight: 1.5 }}>
-        The address of your Snapmaker U1 on your network. Find it on the printer screen under Settings, then Network. Usually just the IP, like 192.168.1.42.
+        {t("settings.printerDescription")}
       </p>
       <form
         className="field"
@@ -259,12 +288,12 @@ function PrinterPanel({ s, onChange }: { s: PublicSettings; onChange: (s: Public
         }}
       >
         <label className="label" htmlFor="host">
-          Printer address
+          {t("settings.printerAddress")}
         </label>
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
           <input id="host" className="input" style={{ flex: "1 1 240px" }} placeholder="192.168.1.42" value={host} onChange={(e) => setHost(e.target.value)} />
           <button className="btn btn-primary" disabled={busy || !host.trim()}>
-            {busy ? "Testing…" : "Test & save"}
+            {busy ? t("settings.testing") : t("settings.testSave")}
           </button>
         </div>
       </form>
@@ -288,9 +317,9 @@ function PowerPanel({ s, onChange }: { s: PublicSettings; onChange: (s: PublicSe
       onChange(await api<PublicSettings>("/api/settings", { method: "PUT", body: JSON.stringify({ haUrl: url, haPlug: plug, haToken: token }) }));
       setToken("");
       const p = await api<{ configured: boolean; state?: string; name?: string; entity?: string; error?: string }>("/api/printer/power");
-      if (!p.configured) setResult({ ok: false, text: "Saved. Set the address, plug and token to use the power button." });
+      if (!p.configured) setResult({ ok: false, text: t("settings.powerSavedHint") });
       else if (p.error) setResult({ ok: false, text: p.error });
-      else setResult({ ok: true, text: `Connected. ${p.name} (${p.entity}) is ${p.state}.` });
+      else setResult({ ok: true, text: t("settings.powerConnected", { name: p.name ?? "Home Assistant", entity: p.entity ?? "—", state: p.state ?? "—" }) });
     } catch (e) {
       setResult({ ok: false, text: (e as Error).message });
     } finally {
@@ -305,10 +334,9 @@ function PowerPanel({ s, onChange }: { s: PublicSettings; onChange: (s: PublicSe
 
   return (
     <section className="panel">
-      <h2>Printer power</h2>
+      <h2>{t("settings.powerTitle")}</h2>
       <p className="small muted" style={{ lineHeight: 1.5 }}>
-        Turns the printer&apos;s smart plug on and off from the printer page, through Home Assistant. Create a long-lived access token in Home Assistant under your
-        profile, then Security. The plug is its entity id (switch.…) or the id at the end of its device page address.
+        {t("settings.powerDescription")}
       </p>
       <form
         style={{ display: "flex", flexDirection: "column", gap: 12 }}
@@ -319,37 +347,37 @@ function PowerPanel({ s, onChange }: { s: PublicSettings; onChange: (s: PublicSe
       >
         <div className="field">
           <label className="label" htmlFor="ha-url">
-            Home Assistant address
+            {t("settings.homeAssistantAddress")}
           </label>
           <input id="ha-url" className="input" placeholder="http://homeassistant.local:8123" value={url} onChange={(e) => setUrl(e.target.value)} />
         </div>
         <div className="field">
           <label className="label" htmlFor="ha-plug">
-            Plug
+            {t("settings.plug")}
           </label>
           <input id="ha-plug" className="input" placeholder="switch.printer_plug" value={plug} onChange={(e) => setPlug(e.target.value)} />
         </div>
         <div className="field">
           <label className="label" htmlFor="ha-token">
-            Long-lived access token
+            {t("settings.longLivedToken")}
           </label>
           <input
             id="ha-token"
             className="input"
             type="password"
             autoComplete="off"
-            placeholder={s.haTokenSet ? "Saved. Paste a new one to replace it." : ""}
+            placeholder={s.haTokenSet ? t("settings.replaceToken") : ""}
             value={token}
             onChange={(e) => setToken(e.target.value)}
           />
         </div>
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
           <button className="btn btn-primary" disabled={busy || (!s.haTokenSet && !token.trim())}>
-            {busy ? "Checking…" : "Save & check"}
+            {busy ? t("settings.checkingPower") : t("settings.saveCheck")}
           </button>
           {s.haTokenSet && (
             <button type="button" className="btn" onClick={() => void removeToken()}>
-              Remove token
+              {t("settings.removeToken")}
             </button>
           )}
         </div>
@@ -378,7 +406,7 @@ function ToolsPanel({ s, onChange, filaments }: { s: PublicSettings; onChange: (
     setSyncMsg(null);
     try {
       const st = await api<{ online: boolean; error?: string; tools?: { filament: { type: string; color: string; loaded: boolean } }[] }>("/api/printer/status");
-      if (!st.online || !st.tools) throw new Error(st.error ?? "The printer is offline.");
+      if (!st.online || !st.tools) throw new Error(st.error ?? t("settings.printerOffline"));
       const pick = (type: string, current: string) => {
         const t = type.toUpperCase();
         if (!t) return current;
@@ -392,7 +420,7 @@ function ToolsPanel({ s, onChange, filaments }: { s: PublicSettings; onChange: (
         return f && f.loaded ? { ...t, preset: pick(f.type, t.preset), color: f.color.toUpperCase() } : t;
       }));
       setSaved(false);
-      setSyncMsg("Read from the printer. Check, then save.");
+      setSyncMsg(t("settings.readPrinterHint"));
     } catch (e) {
       setSyncMsg((e as Error).message);
     }
@@ -400,22 +428,21 @@ function ToolsPanel({ s, onChange, filaments }: { s: PublicSettings; onChange: (
 
   return (
     <section className="panel">
-      <h2>What is loaded in each toolhead</h2>
+      <h2>{t("settings.toolsTitle")}</h2>
       <p className="small muted" style={{ lineHeight: 1.5 }}>
-        The slicer uses these filament profiles, and model colors are matched to these colors. Snapmaker PLA SnapSpeed is tuned for fast printing. The price
-        per kilo of each spool gives the cost shown on models and prints.
+        {t("settings.toolsDescription")}
       </p>
       <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-        {tools.map((t, i) => (
+        {tools.map((tool, i) => (
           <div key={i} className="tool" style={{ flexWrap: "wrap" }}>
-            <span className="tool-chip" style={{ background: t.color, color: inkFor(t.color) }}>
+            <span className="tool-chip" style={{ background: tool.color, color: inkFor(tool.color) }}>
               T{i + 1}
             </span>
             <label className="sr-only" htmlFor={`fil-${i}`}>
-              Filament in T{i + 1}
+              {t("settings.filamentIn", { i: i + 1 })}
             </label>
-            <select id={`fil-${i}`} className="select" style={{ flex: "1 1 240px", width: "auto" }} value={t.preset} onChange={(e) => update(i, { preset: e.target.value })}>
-              {!filaments.includes(t.preset) && <option value={t.preset}>{t.preset}</option>}
+            <select id={`fil-${i}`} className="select" style={{ flex: "1 1 240px", width: "auto" }} value={tool.preset} onChange={(e) => update(i, { preset: e.target.value })}>
+              {!filaments.includes(tool.preset) && <option value={tool.preset}>{tool.preset}</option>}
               {plaFirst.map((f) => (
                 <option key={f} value={f}>
                   {f}
@@ -423,8 +450,8 @@ function ToolsPanel({ s, onChange, filaments }: { s: PublicSettings; onChange: (
               ))}
             </select>
             <label className="small muted" style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              Color
-              <input type="color" value={t.color} onChange={(e) => update(i, { color: e.target.value.toUpperCase() })} style={{ width: 44, height: 36, border: 0, background: "none", cursor: "pointer" }} />
+              {t("settings.color")}
+              <input type="color" value={tool.color} onChange={(e) => update(i, { color: e.target.value.toUpperCase() })} style={{ width: 44, height: 36, border: 0, background: "none", cursor: "pointer" }} />
             </label>
             <label className="small muted" style={{ display: "flex", alignItems: "center", gap: 6 }}>
               <input
@@ -435,23 +462,23 @@ function ToolsPanel({ s, onChange, filaments }: { s: PublicSettings; onChange: (
                 step={0.5}
                 className="input"
                 style={{ width: 80, height: 36 }}
-                value={t.pricePerKg ?? DEFAULT_PRICE_PER_KG}
+                value={tool.pricePerKg ?? DEFAULT_PRICE_PER_KG}
                 onChange={(e) => update(i, { pricePerKg: e.target.value === "" ? undefined : Number(e.target.value) })}
-                aria-label={`Price of the filament in T${i + 1}, euros per kilo`}
+                aria-label={t("settings.priceAria", { i: i + 1 })}
               />
-              €/kg
+              {t("settings.eurosPerKg")}
             </label>
           </div>
         ))}
       </div>
       <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
         <button type="button" className="btn btn-primary" onClick={save}>
-          Save toolheads
+          {t("settings.saveToolheads")}
         </button>
         <button type="button" className="btn" onClick={syncFromPrinter} disabled={!s.printerHost}>
-          Read from printer
+          {t("settings.readPrinter")}
         </button>
-        {saved && <span className="small" style={{ color: "var(--accent-ink)" }}>Saved</span>}
+        {saved && <span className="small" style={{ color: "var(--accent-ink)" }}>{t("settings.saved")}</span>}
         {syncMsg && <span className="small muted">{syncMsg}</span>}
       </div>
     </section>

@@ -67,6 +67,14 @@ export function euros(amount: number | null | undefined) {
   return `${amount.toFixed(2).replace(".", ",")} €`;
 }
 
+/** Format a saved timestamp for the Chinese UI without relying on the browser locale. */
+export function formatDate(value: string | number | Date | null | undefined) {
+  if (value == null) return "—";
+  const date = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(date.getTime())) return "—";
+  return new Intl.DateTimeFormat("zh-CN", { year: "numeric", month: "numeric", day: "numeric" }).format(date);
+}
+
 export async function api<T>(url: string, init?: RequestInit): Promise<T> {
   const res = await fetch(url, {
     ...init,
