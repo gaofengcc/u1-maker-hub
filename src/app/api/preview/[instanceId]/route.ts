@@ -4,6 +4,7 @@ import { downloadInstance } from "@/lib/makerworld.ts";
 import { readPlateMesh } from "@/lib/geometry.ts";
 import { encodeMesh, meshResponseHeaders } from "@/lib/meshFile.ts";
 import { errorResponse } from "@/lib/http.ts";
+import { resolveSite } from "@/lib/sites.ts";
 
 /**
  * The geometry of one plate of a print profile, for the 3D preview, in the format of meshFile.ts.
@@ -15,7 +16,7 @@ export async function GET(req: NextRequest, ctx: RouteContext<"/api/preview/[ins
   const plate = Math.max(0, Math.round(Number(req.nextUrl.searchParams.get("plate") ?? 1)) || 0);
   if (!Number.isInteger(id) || id <= 0) return NextResponse.json({ error: "Invalid profile id." }, { status: 400 });
   try {
-    const { file } = await downloadInstance(id);
+    const { file } = await downloadInstance(id, resolveSite(req.nextUrl.searchParams.get("site")));
     // Bump the version when the geometry reader changes what it returns.
     const cache = `${file}.plate${plate}.v2.mesh`;
     if (!fs.existsSync(cache)) fs.writeFileSync(cache, encodeMesh(await readPlateMesh(file, plate)));

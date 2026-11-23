@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { defaultListing, PAGE_SIZE, PERIODS, search, SORTS, type PeriodKey, type SortKey } from "@/lib/makerworld.ts";
 import { errorResponse } from "@/lib/http.ts";
+import { resolveSite } from "@/lib/sites.ts";
 
 /** ?q, ?sort, ?period, ?offset and ?seed (Random only). Missing or unknown values default like makerworld.com. */
 export async function GET(req: NextRequest) {
@@ -16,7 +17,7 @@ export async function GET(req: NextRequest) {
   const seed = Math.max(0, Math.round(Number(p.get("seed") ?? 0)) || 0);
   try {
     // `next` is the offset of the following page, even when NSFW models made this one shorter.
-    return NextResponse.json({ ...(await search({ q, sort, period, offset, seed })), next: offset + PAGE_SIZE });
+    return NextResponse.json({ ...(await search({ q, sort, period, offset, seed }, resolveSite(p.get("site")))), next: offset + PAGE_SIZE });
   } catch (err) {
     return errorResponse(err);
   }

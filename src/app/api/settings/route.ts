@@ -4,6 +4,7 @@ import { readJson } from "@/lib/http.ts";
 import type { ToolLoad } from "@/lib/slicer.ts";
 import { DEFAULT_PRICE_PER_KG } from "@/lib/format.ts";
 import { isPlugRef } from "@/lib/homeassistant.ts";
+import { resolveSite } from "@/lib/sites.ts";
 
 export async function GET() {
   return NextResponse.json(publicSettings());
@@ -14,8 +15,8 @@ export async function GET() {
  * The Bambu token is managed by /api/auth/token. An empty Home Assistant token keeps the saved one; null removes it.
  */
 export async function PUT(req: Request) {
-  const body = await readJson<{ printerHost?: string; tools?: ToolLoad[]; haUrl?: string; haToken?: string | null; haPlug?: string }>(req);
-  const patch: Parameters<typeof writeSettings>[0] = {};
+  const body = await readJson<{ printerHost?: string; tools?: ToolLoad[]; haUrl?: string; haToken?: string | null; haPlug?: string; site?: string }>(req);
+  const patch: Parameters<typeof writeSettings>[0] = { site: resolveSite(body.site) };
   if (typeof body.printerHost === "string") {
     const host = body.printerHost.trim();
     if (host && !/^(https?:\/\/)?[\w.-]+(:\d+)?\/?$/.test(host)) {
@@ -52,3 +53,5 @@ export async function PUT(req: Request) {
   writeSettings(patch);
   return NextResponse.json(publicSettings());
 }
+
+export const POST = PUT;

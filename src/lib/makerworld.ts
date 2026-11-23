@@ -1,14 +1,14 @@
 import fs from "node:fs";
 import path from "node:path";
-import { DOWNLOAD_DIR, readSettings, writeSettings } from "./store.ts";
+import { DOWNLOAD_DIR, accountOf, writeAccount, clearAccount } from "./store.ts";
+import { resolveSite, siteConfig, type SiteId } from "./sites.ts";
 
 /**
  * Client for MakerWorld's web API (reverse-engineered, unofficial).
  * Search and model pages work without an account. Downloads need the user's Bambu token.
- * The token is only ever sent to api.bambulab.com.
+ * The token is only ever sent to the selected Bambu API site.
  */
 
-const API = "https://api.bambulab.com";
 const UA =
   "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36";
 
@@ -22,11 +22,12 @@ export class MakerWorldError extends Error {
   }
 }
 
-async function call<T>(pathname: string, init: RequestInit & { token?: string } = {}): Promise<T> {
+async function call<T>(pathname: string, init: RequestInit & { token?: string } = {}, site?: SiteId): Promise<T> {
+  const config = siteConfig(resolveSite(site));
   const headers: Record<string, string> = {
     "User-Agent": UA,
     Accept: "application/json",
-    "Accept-Language": "en-US,en;q=0.9",
+    "Accept-Language": config.acceptLanguage,
     ...(init.headers as Record<string, string>),
   };
   if (init.token) headers.Authorization = `Bearer ${init.token}`;
@@ -34,7 +35,7 @@ async function call<T>(pathname: string, init: RequestInit & { token?: string } 
 
   let res: Response | null = null;
   for (let attempt = 0; attempt < 3; attempt++) {
-    res = await fetch(`${API}${pathname}`, { ...init, headers, cache: "no-store" });
+    res = await fetch(`${config.apiBase}${pathname}`, { ...init, headers, cache: "no-store" });
     if (res.status !== 429) break;
     await new Promise((r) => setTimeout(r, 1500 * (attempt + 1)));
   }
@@ -144,7 +145,8 @@ async function cached<T>(key: string, ttlMs: number, load: () => Promise<T>): Pr
  * A page of models, asked for like makerworld.com's All Models page (no keyword) or search page.
  * `seed` keeps a Random listing in the same order from one page to the next.
  */
-export async function search(params: { q: string; sort: SortKey; period: PeriodKey; offset: number; seed?: number }) {
+export async function search(params: { q: string; sort: SortKey; period: PeriodKey; offset: number; seed?: number }, site?: SiteId) {
+  const selectedSite = resolveSite(site);
   const q = params.q.trim();
   const sort = SORTS[params.sort];
   const days = PERIODS[params.period].days;
@@ -164,8 +166,8 @@ export async function search(params: { q: string; sort: SortKey; period: PeriodK
   qs.set("offset", String(params.offset));
 
   // The key holds every parameter, the random seed included.
-  return cached(`search:${qs}`, 5 * 60_000, async () => {
-    const raw = await call<{ total?: number; hits?: RawHit[] }>(`/v1/search-service/select/design2?${qs}`);
+  return cached(`${selectedSite}:search:${qs}`, 5 * 60_000, async () => {
+    const raw = await call<{ total?: number; hits?: RawHit[] }>(`/v1/search-service/select/design2?${qs}`, {}, selectedSite);
     const hits = raw.hits ?? [];
     // NSFW models are left out, so a page can hold fewer than PAGE_SIZE.
     return { total: raw.total ?? hits.length, items: hits.filter((h) => !h.nsfw).map(toCard) };
@@ -250,9 +252,10 @@ type RawDesign = RawHit & {
   coverUrl?: string;
 };
 
-export async function getDesign(id: number): Promise<ModelDetail> {
-  return cached(`design:${id}`, 10 * 60_000, async () => {
-    const d = await call<RawDesign>(`/v1/design-service/design/${id}`);
+export async function getDesign(id: number, site?: SiteId): Promise<ModelDetail> {
+  const selectedSite = resolveSite(site);
+  return cached(`${selectedSite}:design:${id}`, 10 * 60_000, async () => {
+    const d = await call<RawDesign>(`/v1/design-service/design/${id}`, {}, selectedSite);
     const instances: Instance[] = (d.instances ?? []).map((i) => {
       const info = i.extention?.modelInfo;
       return {
@@ -297,15 +300,15 @@ export async function getDesign(id: number): Promise<ModelDetail> {
       createdAt: d.createTime ?? "",
       defaultInstanceId: d.defaultInstanceId,
       instances,
-      url: `https://makerworld.com/en/models/${d.id}${d.slug ? `-${d.slug}` : ""}`,
+      url: `${siteConfig(selectedSite).webBase}/en/models/${d.id}${d.slug ? `-${d.slug}` : ""}`,
     };
   });
 }
 
 // ---------- Download ----------
 
-function requireToken(action = "Downloading") {
-  const token = readSettings().bambuToken;
+function requireToken(site?: SiteId, action = "Downloading") {
+  const token = accountOf(resolveSite(site)).token;
   if (!token) throw new MakerWorldError(`${action} needs your Bambu account. Log in in Settings.`, 403, "login_required");
   return token;
 }
@@ -313,11 +316,11 @@ function requireToken(action = "Downloading") {
 // ---------- Your likes and collected models ----------
 
 /** Pages through one of the account's lists; stops at `max` models. */
-async function myList(path: string, token: string, max = 1000): Promise<ModelCard[]> {
+async function myList(path: string, token: string, site: SiteId, max = 1000): Promise<ModelCard[]> {
   const cards: ModelCard[] = [];
   for (let offset = 0; offset < max; offset += 50) {
     const sep = path.includes("?") ? "&" : "?";
-    const page = await call<{ total?: number; hits?: RawHit[] }>(`${path}${sep}offset=${offset}&limit=50`, { token });
+    const page = await call<{ total?: number; hits?: RawHit[] }>(`${path}${sep}offset=${offset}&limit=50`, { token }, site);
     const hits = page.hits ?? [];
     cards.push(...hits.map(toCard));
     if (hits.length < 50 || cards.length >= (page.total ?? 0)) break;
@@ -329,32 +332,34 @@ async function myList(path: string, token: string, max = 1000): Promise<ModelCar
  * The models the account liked (heart) and collected (bookmark) on MakerWorld. These lists are
  * private: MakerWorld shows them only to their owner, so the Bambu login is needed.
  */
-export async function myMakerWorldSaves(): Promise<{ likes: ModelCard[]; collects: ModelCard[] }> {
-  const token = requireToken("Syncing your MakerWorld likes");
-  let uid = readSettings().bambuUser?.uid;
-  if (!uid) uid = (await call<{ uid?: number }>("/v1/user-service/my/profile", { token })).uid;
+export async function myMakerWorldSaves(site?: SiteId): Promise<{ likes: ModelCard[]; collects: ModelCard[] }> {
+  const selectedSite = resolveSite(site);
+  const token = requireToken(selectedSite, "Syncing your MakerWorld likes");
+  let uid = accountOf(selectedSite).user?.uid;
+  if (!uid) uid = (await call<{ uid?: number }>("/v1/user-service/my/profile", { token }, selectedSite)).uid;
   if (!uid) throw new MakerWorldError("MakerWorld did not say which account this is. Log in again in Settings.", 502);
   const [likes, collects] = await Promise.all([
-    myList("/v1/design-service/my/design/like", token),
-    myList(`/v1/design-service/favorites/designs/${uid}`, token),
+    myList("/v1/design-service/my/design/like", token, selectedSite),
+    myList(`/v1/design-service/favorites/designs/${uid}`, token, selectedSite),
   ]);
   return { likes, collects };
 }
 
 /** Downloads the 3MF of one print profile (instance), caching it on disk. Returns the local path. */
-export async function downloadInstance(instanceId: number): Promise<{ file: string; name: string; cached: boolean }> {
-  fs.mkdirSync(DOWNLOAD_DIR, { recursive: true });
-  const file = path.join(DOWNLOAD_DIR, `${instanceId}.3mf`);
+export async function downloadInstance(instanceId: number, site?: SiteId): Promise<{ file: string; name: string; cached: boolean }> {
+  const selectedSite = resolveSite(site);
+  fs.mkdirSync(path.join(DOWNLOAD_DIR, selectedSite), { recursive: true });
+  const file = path.join(DOWNLOAD_DIR, selectedSite, `${instanceId}.3mf`);
   const metaFile = `${file}.json`;
   if (fs.existsSync(file) && fs.existsSync(metaFile)) {
     const meta = JSON.parse(fs.readFileSync(metaFile, "utf8"));
     return { file, name: meta.name, cached: true };
   }
-  const token = requireToken();
-  const link = await call<{ name?: string; url?: string }>(`/v1/design-service/instance/${instanceId}/f3mf?type=download`, { token });
+  const token = requireToken(selectedSite);
+  const link = await call<{ name?: string; url?: string }>(`/v1/design-service/instance/${instanceId}/f3mf?type=download`, { token }, selectedSite);
   if (!link.url) throw new MakerWorldError("MakerWorld returned no download link for this profile.", 502);
   // The signed CDN URL expires within minutes and must be fetched byte-exact, without auth.
-  const res = await fetch(link.url, { headers: { "User-Agent": UA } });
+  const res = await fetch(link.url, { headers: { "User-Agent": UA, "Accept-Language": siteConfig(selectedSite).acceptLanguage } });
   if (!res.ok) throw new MakerWorldError(`The MakerWorld file server answered ${res.status}.`, res.status);
   const bytes = Buffer.from(await res.arrayBuffer());
   if (bytes.subarray(0, 2).toString() !== "PK") throw new MakerWorldError("The downloaded file is not a 3MF.", 502);
@@ -370,39 +375,42 @@ type LoginResponse = { accessToken?: string; refreshToken?: string; loginType?: 
 
 export type LoginStep = { status: "ok" } | { status: "code"; email: string } | { status: "tfa"; tfaKey: string };
 
-async function finishLogin(r: LoginResponse): Promise<LoginStep> {
+async function finishLogin(r: LoginResponse, site?: SiteId): Promise<LoginStep> {
   if (!r.accessToken) throw new MakerWorldError("Bambu did not return a token.", 502);
-  await saveToken(r.accessToken, r.refreshToken);
+  await saveToken(r.accessToken, r.refreshToken, site);
   return { status: "ok" };
 }
 
-export async function login(email: string, password: string): Promise<LoginStep> {
+export async function login(email: string, password: string, site?: SiteId): Promise<LoginStep> {
+  const selectedSite = resolveSite(site);
   const r = await call<LoginResponse>("/v1/user-service/user/login", {
     method: "POST",
     body: JSON.stringify({ account: email, password, apiError: "" }),
-  });
+  }, selectedSite);
   if (r.loginType === "verifyCode") {
-    await sendLoginCode(email);
+    await sendLoginCode(email, selectedSite);
     return { status: "code", email };
   }
   if (r.loginType === "tfa" && r.tfaKey) return { status: "tfa", tfaKey: r.tfaKey };
-  return finishLogin(r);
+  return finishLogin(r, selectedSite);
 }
 
-export async function sendLoginCode(email: string) {
-  await call("/v1/user-service/user/sendemail/code", { method: "POST", body: JSON.stringify({ email, type: "codeLogin" }) });
+export async function sendLoginCode(email: string, site?: SiteId) {
+  await call("/v1/user-service/user/sendemail/code", { method: "POST", body: JSON.stringify({ email, type: "codeLogin" }) }, resolveSite(site));
 }
 
-export async function loginWithCode(email: string, code: string): Promise<LoginStep> {
+export async function loginWithCode(email: string, code: string, site?: SiteId): Promise<LoginStep> {
+  const selectedSite = resolveSite(site);
   const r = await call<LoginResponse>("/v1/user-service/user/login", {
     method: "POST",
     body: JSON.stringify({ account: email, code }),
-  });
-  return finishLogin(r);
+  }, selectedSite);
+  return finishLogin(r, selectedSite);
 }
 
-export async function loginWithTfa(tfaKey: string, code: string): Promise<LoginStep> {
-  const res = await fetch("https://bambulab.com/api/sign-in/tfa", {
+export async function loginWithTfa(tfaKey: string, code: string, site?: SiteId): Promise<LoginStep> {
+  const selectedSite = resolveSite(site);
+  const res = await fetch(siteConfig(selectedSite).tfaUrl, {
     method: "POST",
     headers: { "User-Agent": UA, "Content-Type": "application/json", Accept: "application/json" },
     body: JSON.stringify({ tfaKey, tfaCode: code }),
@@ -411,20 +419,16 @@ export async function loginWithTfa(tfaKey: string, code: string): Promise<LoginS
   const cookieToken = /(?:^|[;,]\s*)token=([^;]+)/.exec(res.headers.get("set-cookie") ?? "")?.[1];
   const accessToken = body.accessToken ?? cookieToken;
   if (!res.ok || !accessToken) throw new MakerWorldError(body.error ?? "The authenticator code was refused.", res.status || 400);
-  return finishLogin({ accessToken, refreshToken: body.refreshToken });
+  return finishLogin({ accessToken, refreshToken: body.refreshToken }, selectedSite);
 }
 
-export async function saveToken(rawToken: string, refreshToken?: string) {
+export async function saveToken(rawToken: string, refreshToken?: string, site?: SiteId) {
+  const selectedSite = resolveSite(site);
   const token = rawToken.trim().replace(/^Bearer\s+/i, "").replace(/^token=/, "");
-  const profile = await call<{ uid?: number; name?: string; handle?: string; avatar?: string }>("/v1/user-service/my/profile", { token });
-  writeSettings({
-    bambuToken: token,
-    bambuRefreshToken: refreshToken,
-    bambuUser: { uid: profile.uid, name: profile.name ?? profile.handle, avatar: profile.avatar },
-    tokenSavedAt: new Date().toISOString(),
-  });
+  const profile = await call<{ uid?: number; name?: string; handle?: string; avatar?: string }>("/v1/user-service/my/profile", { token }, selectedSite);
+  writeAccount(selectedSite, { token, refreshToken, user: { uid: profile.uid, name: profile.name ?? profile.handle, avatar: profile.avatar }, savedAt: new Date().toISOString() });
 }
 
-export function logout() {
-  writeSettings({ bambuToken: undefined, bambuRefreshToken: undefined, bambuUser: undefined, tokenSavedAt: undefined });
+export function logout(site?: SiteId) {
+  clearAccount(resolveSite(site));
 }

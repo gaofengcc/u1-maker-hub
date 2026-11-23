@@ -5,6 +5,7 @@ import type { PlateTransform } from "@/lib/geometry.ts";
 import { errorResponse, readJson } from "@/lib/http.ts";
 import { getUpload, uploadKind } from "@/lib/uploads.ts";
 import { cleanOrient } from "@/lib/orient.ts";
+import { resolveSite } from "@/lib/sites.ts";
 
 export async function GET() {
   return NextResponse.json(listJobs().map((job) => ({ ...job, log: [] })));
@@ -23,6 +24,7 @@ type Body = {
   transform?: { scale?: number; rotation?: number; orient?: unknown };
   filamentToTool?: number[];
   send?: boolean;
+  site?: string;
 };
 
 /** 10% to 500%, a rotation in 0..359 degrees, and an orientation when it is a real rotation. */
@@ -64,6 +66,7 @@ export async function POST(req: Request) {
       transform: cleanTransform(b.transform),
       filamentToTool: Array.isArray(b.filamentToTool) ? b.filamentToTool.map(Number) : [],
       send: Boolean(b.send),
+      site: resolveSite(b.site),
     });
     return NextResponse.json(job, { status: 201 });
   } catch (err) {

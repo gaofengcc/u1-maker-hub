@@ -3,8 +3,9 @@ import { createJob } from "@/lib/jobs.ts";
 import { listPlate } from "@/lib/plate.ts";
 import { DEFAULT_OPTIONS, PRINT_MODES, type PrintMode, type PrintOptions } from "@/lib/slicer.ts";
 import { errorResponse, readJson } from "@/lib/http.ts";
+import { resolveSite } from "@/lib/sites.ts";
 
-type Body = { mode?: string; options?: Partial<PrintOptions>; send?: boolean };
+type Body = { mode?: string; options?: Partial<PrintOptions>; send?: boolean; site?: string };
 
 /** Slices everything on the plate, on as many U1 plates as needed, and optionally sends the first one to the printer. */
 export async function POST(req: Request) {
@@ -15,6 +16,7 @@ export async function POST(req: Request) {
   const names = entries.map((e) => (e.copies > 1 ? `${e.copies}× ${e.title}` : e.title));
   try {
     const job = createJob({
+      site: resolveSite(b.site ?? entries[0].site),
       designId: entries[0].designId,
       instanceId: entries[0].instanceId,
       title: `Plate: ${names.join(", ")}`.slice(0, 200),
@@ -22,7 +24,8 @@ export async function POST(req: Request) {
       mode,
       options: { ...DEFAULT_OPTIONS, ...(b.options ?? {}) },
       plate: 1,
-      items: entries.map(({ designId, instanceId, uploadId, title, plate, size, rotation, orient, copies, bed, filamentToTool }) => ({
+      items: entries.map(({ site, designId, instanceId, uploadId, title, plate, size, rotation, orient, copies, bed, filamentToTool }) => ({
+        site: resolveSite(site),
         designId,
         instanceId,
         uploadId,

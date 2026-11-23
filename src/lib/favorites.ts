@@ -2,6 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { DATA_DIR } from "./store.ts";
 import type { ModelCard } from "./makerworld.ts";
+import { isSiteId, resolveSite, type SiteId } from "./sites.ts";
 
 /**
  * Saved models, kept in ./data/favorites.json. A snapshot of the card is stored so the list shows without calling MakerWorld.
@@ -10,6 +11,7 @@ import type { ModelCard } from "./makerworld.ts";
 
 export type FavoriteSource = "app" | "mw-like" | "mw-collect";
 export type Favorite = ModelCard & {
+  site?: SiteId;
   savedAt: string;
   /** Where the model was saved; missing on saves made before MakerWorld sync, which all came from the app. */
   sources?: FavoriteSource[];
@@ -28,7 +30,7 @@ export function sourcesOf(f: Favorite): FavoriteSource[] {
 export function listFavorites(): Favorite[] {
   try {
     const list = JSON.parse(fs.readFileSync(FILE, "utf8")) as Favorite[];
-    return Array.isArray(list) ? list.map((f) => ({ ...f, sources: sourcesOf(f) })) : [];
+    return Array.isArray(list) ? list.map((f) => ({ ...f, site: isSiteId(f.site) ? f.site : "intl", sources: sourcesOf(f) })) : [];
   } catch {
     return [];
   }
@@ -55,11 +57,12 @@ function snapshot(card: ModelCard): ModelCard {
 }
 
 /** Saves a model in the app. It keeps any MakerWorld source it already has. */
-export function addFavorite(card: ModelCard): Favorite[] {
+export function addFavorite(card: ModelCard, site?: SiteId): Favorite[] {
+  const selectedSite = resolveSite(site);
   const list = listFavorites();
-  const existing = list.find((f) => f.id === card.id);
+  const existing = list.find((f) => f.site === selectedSite && f.id === card.id);
   const sources = [...new Set<FavoriteSource>(["app", ...(existing ? sourcesOf(existing) : [])])];
-  write([{ ...snapshot(card), savedAt: new Date().toISOString(), sources }, ...list.filter((f) => f.id !== card.id)]);
+  write([{ ...snapshot(card), site: selectedSite, savedAt: new Date().toISOString(), sources }, ...list.filter((f) => !(f.site === selectedSite && f.id === card.id))]);
   return listFavorites();
 }
 
@@ -67,9 +70,10 @@ export function addFavorite(card: ModelCard): Favorite[] {
  * Removes the app's save. A model also liked or collected on MakerWorld stays, labelled with that
  * source, until it is unliked there: the app never changes the MakerWorld account.
  */
-export function removeFavorite(id: number): Favorite[] {
+export function removeFavorite(id: number, site?: SiteId): Favorite[] {
+  const selectedSite = resolveSite(site);
   const next = listFavorites()
-    .map((f) => (f.id === id ? { ...f, sources: sourcesOf(f).filter((s) => s !== "app") } : f))
+    .map((f) => (f.site === selectedSite && f.id === id ? { ...f, sources: sourcesOf(f).filter((s) => s !== "app") } : f))
     .filter((f) => f.sources!.length > 0);
   write(next);
   return listFavorites();
@@ -80,30 +84,33 @@ export function removeFavorite(id: number): Favorite[] {
  * added, their cards refreshed, and a MakerWorld source is dropped once the model is no longer liked or
  * collected there. App saves are never touched.
  */
-export function mergeMakerWorld(likes: ModelCard[], collects: ModelCard[]): Favorite[] {
+export function mergeMakerWorld(likes: ModelCard[], collects: ModelCard[], site?: SiteId): Favorite[] {
+  const selectedSite = resolveSite(site);
   const now = new Date().toISOString();
-  const mw = new Map<number, { card: ModelCard; sources: FavoriteSource[] }>();
+  const mw = new Map<string, { card: ModelCard; sources: FavoriteSource[] }>();
   for (const [cards, source] of [
     [likes, "mw-like"],
     [collects, "mw-collect"],
   ] as const) {
     for (const card of cards) {
-      const entry = mw.get(card.id) ?? { card, sources: [] };
+      const key = `${selectedSite}:${card.id}`;
+      const entry = mw.get(key) ?? { card, sources: [] };
       entry.sources.push(source);
-      mw.set(card.id, entry);
+      mw.set(key, entry);
     }
   }
   const list = listFavorites();
   const kept = list
     .map((f) => {
-      const fromMw = mw.get(f.id);
+      if (f.site !== selectedSite) return f;
+      const fromMw = mw.get(`${selectedSite}:${f.id}`);
       const sources = [...sourcesOf(f).filter((s) => s === "app"), ...(fromMw?.sources ?? [])];
       return { ...f, ...(fromMw ? snapshot(fromMw.card) : {}), sources };
     })
-    .filter((f) => f.sources.length > 0);
-  const known = new Set(list.map((f) => f.id));
+    .filter((f) => f.sources!.length > 0);
+  const known = new Set(list.map((f) => `${f.site}:${f.id}`));
   // New on MakerWorld: first seen now, in the order MakerWorld lists them (newest first).
-  const added = [...mw.values()].filter((e) => !known.has(e.card.id)).map((e) => ({ ...snapshot(e.card), savedAt: now, sources: e.sources }));
+  const added = [...mw.values()].filter((e) => !known.has(`${selectedSite}:${e.card.id}`)).map((e) => ({ ...snapshot(e.card), savedAt: now, site: selectedSite, sources: e.sources }));
   write([...added, ...kept]);
   return listFavorites();
 }

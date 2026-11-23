@@ -10,6 +10,7 @@ import type { PlateEntry } from "./plate.ts";
 import { combineProjects } from "./combine.ts";
 import { getStatus, runGcode, safeRemoteName, startPrint, uploadGcode } from "./printer.ts";
 import { uploadFilePath, uploadProjectPath, type UploadKind } from "./uploads.ts";
+import { isSiteId, type SiteId } from "./sites.ts";
 
 /** A print job: download from MakerWorld (or take an uploaded STL or 3MF), swap in U1 presets, slice, then optionally send to the printer. */
 
@@ -19,6 +20,7 @@ export type StepState = "pending" | "running" | "done" | "error" | "skipped";
 export type Job = {
   id: string;
   createdAt: string;
+  site: SiteId;
   designId: number;
   instanceId: number;
   title: string;
@@ -51,11 +53,11 @@ export type Job = {
 export type JobStats = { seconds: number | null; grams: number | null; toolChanges: number | null; gramsByFilament?: number[] };
 export type JobPlate = { gcode: string; project: string; stats: JobStats; remoteName: string | null };
 
-export type NewJob = Pick<Job, "designId" | "instanceId" | "title" | "cover" | "mode" | "options" | "plate" | "transform" | "items" | "upload" | "filamentToTool" | "send">;
+export type NewJob = Pick<Job, "site" | "designId" | "instanceId" | "title" | "cover" | "mode" | "options" | "plate" | "transform" | "items" | "upload" | "filamentToTool" | "send">;
 
 export type PlateJobItem = Pick<
   PlateEntry,
-  "designId" | "instanceId" | "uploadId" | "title" | "plate" | "size" | "rotation" | "orient" | "copies" | "bed" | "filamentToTool"
+  "site" | "designId" | "instanceId" | "uploadId" | "title" | "plate" | "size" | "rotation" | "orient" | "copies" | "bed" | "filamentToTool"
 >;
 
 const STEP_LABELS: Record<StepKey, string> = {
@@ -82,7 +84,8 @@ export function getJob(id: string): Job | null {
   const live = registry.get(id);
   if (live) return live;
   try {
-    return JSON.parse(fs.readFileSync(jobFile(id), "utf8"));
+    const job = JSON.parse(fs.readFileSync(jobFile(id), "utf8")) as Job;
+    return { ...job, site: isSiteId(job.site) ? job.site : "intl" };
   } catch {
     return null;
   }
@@ -101,6 +104,7 @@ export function listJobs(limit = 20): Job[] {
 export function createJob(input: NewJob): Job {
   const job: Job = {
     ...input,
+    site: isSiteId(input.site) ? input.site : "intl",
     id: crypto.randomUUID(),
     createdAt: new Date().toISOString(),
     status: "running",
@@ -195,7 +199,7 @@ async function runJob(job: Job) {
       const files: string[] = [];
       for (const [i, item] of job.items.entries()) {
         setStep(job, "download", "running", `${i + 1} of ${job.items.length} · ${item.title}`);
-        files.push(item.uploadId ? await uploadProjectPath(item.uploadId) : (await downloadInstance(item.instanceId)).file);
+        files.push(item.uploadId ? await uploadProjectPath(item.uploadId) : (await downloadInstance(item.instanceId, item.site ?? job.site)).file);
       }
       setStep(job, "download", "done", `${files.length} model${files.length > 1 ? "s" : ""}`);
 
@@ -218,7 +222,7 @@ async function runJob(job: Job) {
       setStep(job, "presets", "done", `${placed.copies} object${placed.copies > 1 ? "s" : ""} on ${where} · T1–T4`);
     } else {
       setStep(job, "download", "running");
-      const download = await downloadInstance(job.instanceId);
+      const download = await downloadInstance(job.instanceId, job.site);
       setStep(job, "download", "done", download.cached ? "Already downloaded" : download.name);
 
       setStep(job, "presets", "running");

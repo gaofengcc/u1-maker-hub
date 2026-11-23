@@ -5,11 +5,13 @@ import { DATA_DIR } from "./store.ts";
 import { MAX_BEDS } from "./packing.ts";
 import { cleanOrient, type Orient } from "./orient.ts";
 import { isUploadId } from "./uploads.ts";
+import { isSiteId, resolveSite, type SiteId } from "./sites.ts";
 
 /** The models waiting to be printed together on one plate, kept in ./data/plate.json. */
 
 export type PlateEntry = {
   id: string;
+  site?: SiteId;
   /** MakerWorld design and print profile; both 0 for an uploaded model. */
   designId: number;
   instanceId: number;
@@ -42,8 +44,8 @@ const FILE = path.join(DATA_DIR, "plate.json");
 
 export function listPlate(): PlateEntry[] {
   try {
-    const list = JSON.parse(fs.readFileSync(FILE, "utf8")) as PlateEntry[];
-    return Array.isArray(list) ? list : [];
+    const list = JSON.parse(fs.readFileSync(FILE, "utf8")) as Partial<PlateEntry>[];
+    return Array.isArray(list) ? list.map((e) => ({ ...e, site: isSiteId(e.site) ? e.site : "intl" } as PlateEntry)) : [];
   } catch {
     return [];
   }
@@ -75,18 +77,19 @@ function clean(change: PlateChange) {
   return out;
 }
 
-export function addToPlate(input: Omit<PlateEntry, "id" | "addedAt">): PlateEntry[] {
+export function addToPlate(input: Omit<PlateEntry, "id" | "addedAt" | "site"> & { site?: SiteId }): PlateEntry[] {
   return write([...listPlate(), newEntry(input)]);
 }
 
 /** Adds several models at once, for example every plate of one print profile. */
-export function addManyToPlate(inputs: Omit<PlateEntry, "id" | "addedAt">[]): PlateEntry[] {
+export function addManyToPlate(inputs: (Omit<PlateEntry, "id" | "addedAt" | "site"> & { site?: SiteId })[]): PlateEntry[] {
   return write([...listPlate(), ...inputs.map(newEntry)]);
 }
 
-function newEntry(input: Omit<PlateEntry, "id" | "addedAt">): PlateEntry {
+function newEntry(input: Omit<PlateEntry, "id" | "addedAt" | "site"> & { site?: SiteId }): PlateEntry {
   return {
     id: crypto.randomUUID(),
+    site: resolveSite(input.site),
     designId: input.uploadId ? 0 : Number(input.designId),
     instanceId: input.uploadId ? 0 : Number(input.instanceId),
     ...(input.uploadId && isUploadId(input.uploadId) ? { uploadId: input.uploadId } : {}),

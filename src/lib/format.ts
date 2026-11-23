@@ -1,4 +1,5 @@
 /** Browser-safe helpers shared by client components. */
+import { cdnHostFor } from "./sites.ts";
 
 /**
  * MakerWorld serves 1080p PNG originals (often 2 to 3 MB). Its CDN resizes and converts on the fly
@@ -8,7 +9,7 @@ export function mwImage(url: string | undefined | null, width: number) {
   if (!url) return "";
   try {
     const u = new URL(url);
-    if (!u.hostname.endsWith("bblmw.com") || u.search) return url;
+    if (!cdnHostFor(u.hostname) || u.search) return url;
     return `${url}?x-oss-process=image/resize,w_${width}/format,webp`;
   } catch {
     return url;

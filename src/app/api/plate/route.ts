@@ -2,6 +2,7 @@ import { connection, NextResponse } from "next/server";
 import { addManyToPlate, addToPlate, clearPlate, listPlate, type PlateEntry } from "@/lib/plate.ts";
 import { readJson } from "@/lib/http.ts";
 import { getUpload } from "@/lib/uploads.ts";
+import { resolveSite } from "@/lib/sites.ts";
 
 type NewEntry = Omit<PlateEntry, "id" | "addedAt">;
 
@@ -16,13 +17,13 @@ const valid = (b: NewEntry) =>
 
 /** Adds a model (one profile and plate of it, or an upload) to the plate, or a list of them at once. */
 export async function POST(req: Request) {
-  const b = await readJson<NewEntry | NewEntry[]>(req);
+  const b = await readJson<NewEntry & { site?: string } | (NewEntry & { site?: string })[]>(req);
   if (Array.isArray(b)) {
     if (!b.length || b.length > 50 || !b.every(valid)) return NextResponse.json({ error: "Invalid models." }, { status: 400 });
-    return NextResponse.json(addManyToPlate(b));
+    return NextResponse.json(addManyToPlate(b.map((e) => ({ ...e, site: resolveSite(e.site) }))));
   }
   if (!valid(b)) return NextResponse.json({ error: "Invalid model." }, { status: 400 });
-  return NextResponse.json(addToPlate(b));
+  return NextResponse.json(addToPlate({ ...b, site: resolveSite(b.site) }));
 }
 
 export async function DELETE() {

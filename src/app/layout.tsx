@@ -31,6 +31,8 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
         {/* Open the connection to MakerWorld's image CDN before the first image is requested. */}
         <link rel="preconnect" href="https://makerworld.bblmw.com" />
         <link rel="dns-prefetch" href="https://makerworld.bblmw.com" />
+        <link rel="preconnect" href="https://makerworld.bblmw.cn" />
+        <link rel="dns-prefetch" href="https://makerworld.bblmw.cn" />
       </head>
       <body>
         <Suspense fallback={<header className="header" style={{ height: 65 }} />}>
