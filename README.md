@@ -1,158 +1,186 @@
 # 🖨️ U1 Maker Hub
 
+**简体中文** ｜ [English](README.en.md)
+
 > [!WARNING]
-> 🚧 **This project is vibe-coded.** It was built quickly, with heavy help from an AI coding assistant, for my own personal use with my own printer. Expect bugs, rough edges and missing checks. It works for me, but it has not been hardened or tested on other setups. I'm releasing it in case it helps other Snapmaker U1 owners, and I will keep improving it. Issues and pull requests are welcome.
+> 🚧 **这个项目是边聊边写出来的（vibe-coded）。** 我用 AI 辅助快速攒起来，给自己和自家打印机用。bug、粗糙的地方、缺失的校验都会有。在我这儿能跑，但没在别的环境上加固和测试过。放出来是希望帮到其他 Snapmaker U1 机主，我也会继续改。欢迎提 issue 和 PR。
 
-**🌍 From MakerWorld to your Snapmaker U1 in a few taps. ✨**
+**🌍 点几下，把模型网站上的东西送到你的 Snapmaker U1。✨**
 
-U1 Maker Hub is a self-hosted web app that lets you browse MakerWorld, re-slice any model for the **Snapmaker U1** with tuned presets, and send it straight to the printer, from your phone or your desktop. 📱💻
+U1 Maker Hub 是一个自托管的网页应用：浏览模型、按 U1 的预设重新切片、直接发送到打印机，手机和电脑都能用。📱💻
 
 <p align="center">
-  <img src="docs/screenshots/explore.png" alt="Explore MakerWorld models" width="100%">
+  <img src="docs/screenshots/explore.png" alt="浏览模型" width="100%">
 </p>
 
-## 🤔 Why
+## 🤔 为什么要做这个
 
-MakerWorld has a huge library of models, but most of them come with Bambu Lab print profiles. Printing them on a Snapmaker U1 means downloading the 3MF, opening a slicer, swapping the printer, process and filament settings, mapping colours to toolheads, exporting the G-code and uploading it. U1 Maker Hub does all of that in one screen: pick a model, pick a preset, press **Print**.
+MakerWorld 上有海量模型，但绝大多数附带的是拓竹的打印配置。想拿到 Snapmaker U1 上打印，得下载 3MF、打开切片软件、换打印机、换流程、换耗材、把颜色映射到喷头、导出 G-code、再上传。U1 Maker Hub 把这些压到一个页面里：选模型、选预设、点**打印**。
 
-## ✨ Features
+## ✨ 功能
 
-### 🔎 Find models
-- 🌐 **Explore:** search and trending models from MakerWorld, no account needed.
-- ❤️ **Saved models:** keep favourites to print later.
-- 📤 **Uploads:** bring your own STL or 3MF files.
+### 🔎 找模型
 
-### 🛠️ Prepare the print
-- 🎛️ **Tuned U1 presets:** Fast & clean, Standard and Fine detail. The Bambu settings in the 3MF are replaced with a complete U1 configuration; geometry, plates and colour painting are kept.
-- 🧑‍🎓 **Beginner-friendly options:** supports, brim, size and orientation, without slicer jargon.
-- 📐 **Adaptive layer heights:** computed from the slope of the mesh, like OrcaSlicer's "Adaptive" button, because OrcaSlicer's command line ignores that setting.
-- 🎨 **Multi-colour:** choose which of the U1's four toolheads prints each colour. More than four colours can share toolheads.
-- 🧩 **Multi-model plates:** combine several models and copies on one plate, with automatic packing onto as many plates as needed.
-- 👀 **Preview:** 3D bed view before slicing and toolpath view after slicing, with print time, filament use and cost.
+- 🌐 **三个内容来源**：MakerWorld 中国站、MakerWorld 国际站、Snapmaker Space 国际站。浏览时用下拉框切站。
+- 🔀 **跨站搜索**：输入关键词后，三个站同时搜，结果按站点交替穿插。上面的标签可以多选，把不想看的站剔掉。
+- ❤️ **收藏**：留着以后打印。
+- 📤 **上传**：自己手里的 STL 或 3MF 也能用。
 
-### 🚀 Print and monitor
-- ⚡ **One-click send:** slices with OrcaSlicer, uploads to the U1 through Moonraker, maps colours to toolheads and starts the print.
-- 📷 **My printer:** live state, camera, temperatures, the four toolheads, pause, resume, cancel, speed, fan and light.
-- 🔌 **Printer power (optional):** turn the printer's smart plug on and off through Home Assistant. Turning off is blocked while a print is running.
-- 📲 **Installable PWA:** mobile-first layout, add it to your phone's home screen.
+### 🛠️ 准备打印
 
-## 📸 Screenshots
+- 🎛️ **调过的 U1 预设**：快速、标准、精细三档。3MF 里的拓竹配置会被换成完整的 U1 配置，模型几何、盘面和上色都保留。
+- 🧑‍🎓 **不用懂切片参数**：支撑、边缘、缩放、摆放，都用大白话。
+- 📐 **自适应层高**：根据模型表面的坡度自动算，效果等同于 OrcaSlicer 里的「自适应」按钮——因为 OrcaSlicer 的命令行不认那个设置。
+- 🎨 **多色**：U1 四个喷头，每种颜色用哪个喷头由你定。超过四种颜色可以共用喷头。
+- 🧩 **一盘多个模型**：几个模型和副本摆在同一盘，放不下就自动排到下一盘。
+- 👀 **预览**：切片前看 3D 盘面，切片后看走刀路径，附带打印时长、耗材用量和成本。
 
-| Model page: profile, U1 preset and options | Printer: toolheads, camera and live controls |
+### 🚀 打印和监控
+
+- ⚡ **一键发送**：调 OrcaSlicer 切片，通过 Moonraker 上传到 U1，映射颜色到喷头，然后启动。
+- 📷 **我的打印机**：实时状态、摄像头、温度、四个喷头、暂停、继续、取消、速度、风扇和照明。
+- 🔌 **打印机电源（可选）**：通过 Home Assistant 控制打印机的智能插座。打印中禁止断电。
+- 📲 **可安装的 PWA**：为手机排的版式，能加到主屏幕。
+
+## 📸 截图
+
+| 模型页：配置、U1 预设和选项 | 打印机页：喷头、摄像头和实时控制 |
 |---|---|
-| ![Model page](docs/screenshots/model.png) | ![Printer page](docs/screenshots/printer.png) |
+| ![模型页](docs/screenshots/model.png) | ![打印机页](docs/screenshots/printer.png) |
 
-| Settings | On your phone |
+| 设置 | 手机上 |
 |---|---|
-| ![Settings page](docs/screenshots/settings.png) | <img src="docs/screenshots/mobile-explore.png" alt="Explore on a phone" width="32%"> <img src="docs/screenshots/mobile-model.png" alt="Model page on a phone" width="32%"> <img src="docs/screenshots/mobile-printer.png" alt="Printer page on a phone" width="32%"> |
+| ![设置页](docs/screenshots/settings.png) | <img src="docs/screenshots/mobile-explore.png" alt="手机上的浏览页" width="32%"> <img src="docs/screenshots/mobile-model.png" alt="手机上的模型页" width="32%"> <img src="docs/screenshots/mobile-printer.png" alt="手机上的打印机页" width="32%"> |
 
-## 📋 Requirements
+## 📋 运行要求
 
-- 🧠 **OrcaSlicer 2.4 or newer.** On macOS: `brew install --cask orcaslicer`. On Linux, see `deploy/setup-lxc.sh`. Snapmaker Orca's command line crashes on recent Bambu files, so it is not used.
-- 🟢 **Node 20 or newer**, and pnpm.
-- 👤 **A Bambu Lab account** to download files. Search works without one.
-- 🖨️ **A Snapmaker U1** on the same network. Its Moonraker API must accept this computer; see Troubleshooting.
+- 🧠 **OrcaSlicer 2.4 或更新版本。** macOS 上 `brew install --cask orcaslicer`；Linux 见 `deploy/setup-lxc.sh`。Snapmaker 定制版 Orca 的命令行处理新版拓竹文件会段错误，所以不用它。
+- 🟢 **Node 20 或更新版本**，以及 pnpm。
+- 👤 **下载文件需要拓竹账号**。只搜索不需要。
+- 🖨️ **同一局域网里的 Snapmaker U1**。它的 Moonraker 接口得允许这台机器访问，见「常见问题」。
+- 🔑 **要下载 Snapmaker Space 的模型**，需要一份登录 token，放进 `data/snapmaker-auth.json`（见下方说明）。
 
-## ⚡ Quick start
+## ⚡ 快速开始
 
 ```bash
 pnpm install
 pnpm dev            # http://localhost:3000
 ```
 
-Then open **Settings**:
+然后打开**设置**页：
 
-1. Log in with your Bambu account. Email and password work, plus an emailed or authenticator code. You can also paste the `token` cookie from makerworld.com.
-2. Enter the printer address, for example `192.168.1.42`, and press **Test & save**.
-3. Set what is loaded in T1 to T4, or press **Read from printer**.
-4. Optional: set your Home Assistant address, the plug's entity id and a long-lived access token to get a power button.
+1. 用拓竹账号登录。邮箱加密码可以，邮箱验证码和验证器也支持。也可以直接粘贴 makerworld.com 的 `token` cookie。
+2. 填打印机地址（例如 `192.168.1.42`），点**测试并保存**。
+3. 设置 T1 到 T4 各装的什么耗材，或者点**从打印机读取**。
+4. 可选：填 Home Assistant 地址、插座的实体 ID 和长期访问令牌，就有电源按钮了。
+5. 可选：要用 Snapmaker Space 的模型，把 `access` 和 `refresh` 两个 token 写进 `data/snapmaker-auth.json`，格式见下文。access 过期后应用会自动用 refresh 续期，不用手动换。
 
-🧪 To work without the printer, run a fake U1 and use `localhost:7125` as the printer address:
+🧪 手边没有打印机也能开发，跑一个假 U1，把打印机地址填 `localhost:7125`：
 
 ```bash
 pnpm mock-printer
 ```
 
+### 🔑 Snapmaker Space 的凭据
+
+在浏览器登录 `space.snapmaker.com`，F12 打开开发者工具 → Application → Cookies，复制 `login_access_token` 和 `login_refresh_token`，写成：
+
+```json
+{
+  "access": "eyJraWQiOi...",
+  "refresh": "Os3jbN2q..."
+}
+```
+
+存到 `data/snapmaker-auth.json`，权限设成 `600`。这个目录已被 git 忽略。
+
+> [!NOTE]
+> access token 有效期 24 小时，refresh 有效期约 30 天。应用会在 access 快过期时自动用 refresh 换新的，并把换回来的新凭据写回这个文件。只有当 refresh 本身失效（比如你重新登录过、或者超过 30 天没动）才需要重新填一次。
+
 ## 🐳 Docker
 
-The image bundles OrcaSlicer, so Docker is all you need:
+镜像里已经打好 OrcaSlicer，只要有 Docker 就行：
 
 ```bash
-docker compose up -d --build      # http://<host>:3000
+docker compose up -d --build      # http://<宿主机>:3000
 docker compose logs -f
 ```
 
-Settings, the Bambu token, favourites, downloads and jobs are kept in the `u1-data` volume. To pick another OrcaSlicer release, change `ORCA_VERSION` in `docker-compose.yml` and rebuild.
+设置、拓竹 token、收藏、下载和任务都存在 `u1-data` 卷里。想换 OrcaSlicer 版本，改 `docker-compose.yml` 里的 `ORCA_VERSION` 再重新构建。
 
-⚠️ The image is `linux/amd64` only, because OrcaSlicer publishes no ARM Linux build. It runs on ARM hosts (Apple Silicon, Raspberry Pi) through emulation, but slicing becomes several times slower; an x86_64 machine is strongly recommended.
+⚠️ 镜像只有 `linux/amd64`，因为 OrcaSlicer 没有发布 ARM 版 Linux 构建。在 ARM 机器（Apple Silicon、树莓派）上能靠模拟跑起来，但切片会慢好几倍，**强烈建议用 x86_64 机器**。
 
-### 📊 Resources
+### 📊 资源占用
 
-Slicing is the only heavy part; the web app itself idles at about 140 MB. OrcaSlicer runs once per plate, one plate after the other, so peaks don't add up.
+切片是唯一吃资源的部分，网页本身空闲时大约 140 MB。OrcaSlicer 是逐盘运行的，一盘切完再切下一盘，峰值不会叠加。
 
-| | Minimum | Recommended |
+| | 最低 | 推荐 |
 |---|---|---|
-| 🧮 CPU | 1 core | 2 to 4 cores. OrcaSlicer is multi-threaded: more cores mean faster slicing, not more capacity |
-| 🧠 RAM | 2 GB | **3 GB + 512 MB swap** (the compose default). A 5-colour model peaks at about 600 MB; a large vase-mode model peaks at 1.6 GB on Fast and 2.7 GB on Fine detail |
-| 💾 Disk | 3 GB | 10 GB. The image is about 600 MB to download and 1.7 GB on disk; downloads and jobs grow over time in the `u1-data` volume, clean it up now and then |
+| 🧮 CPU | 1 核 | 2 到 4 核。OrcaSlicer 是多线程的：核多只影响切片快慢，不影响能切多大的模型 |
+| 🧠 内存 | 2 GB | **3 GB + 512 MB swap**（compose 里的默认值）。五色模型的峰值约 600 MB；大盘的螺旋花瓶模式模型，快速档峰值约 1.6 GB，精细档约 2.7 GB |
+| 💾 硬盘 | 3 GB | 10 GB。镜像下载约 600 MB、占盘约 1.7 GB；下载和任务会随着使用在 `u1-data` 卷里堆积，记得偶尔清一清 |
 
-💥 If the slicer hits the memory limit, the kernel kills it and the print fails with a slicing error: raise `memory` in `docker-compose.yml` or pick a faster preset. With less than 2 GB, keep to small models on Fast.
+💥 切片器撞到内存上限时会被内核杀掉，打印会以切片失败告终：调高 `docker-compose.yml` 里的 `memory`，或者换更快的预设。内存不到 2 GB 的话，就只切小模型、只用快速档。
 
-## 🏠 Self-hosting without Docker
+## 🏠 不用 Docker 自己部署
 
-The app is meant to run on a small always-on machine on your home network. `deploy/` has scripts for an Ubuntu 24.04 server or LXC container:
+这个应用适合跑在家里的常开小机器上。`deploy/` 里有给 Ubuntu 24.04 服务器或 LXC 容器准备的脚本：
 
-1. Provision it once (Node 22, OrcaSlicer and its libraries, a service user and a systemd unit):
-
-   ```bash
-   ssh root@<server-ip> 'bash -s' < deploy/setup-lxc.sh
-   ```
-
-2. Deploy or update the app (rsync, install, build, restart, health check):
+1. 初始化（装 Node 22、OrcaSlicer 及其依赖库、服务账号和 systemd 单元）：
 
    ```bash
-   DEPLOY_HOST=root@<server-ip> deploy/deploy.sh
+   ssh root@<服务器IP> 'bash -s' < deploy/setup-lxc.sh
    ```
 
-3. Open `http://<server-ip>:3000` and configure it in **Settings**.
+2. 部署或更新应用（rsync、安装、构建、重启、健康检查）：
 
-Data lives in `/var/lib/u1-maker-hub` on the server. Give it about 3 GB of RAM: slicer memory depends on the model, and a large model on Fine detail can peak around 2.7 GB.
+   ```bash
+   DEPLOY_HOST=root@<服务器IP> deploy/deploy.sh
+   ```
+
+3. 打开 `http://<服务器IP>:3000`，在**设置**页完成配置。
+
+数据存放在服务器的 `/var/lib/u1-maker-hub`。给它 3 GB 左右内存：切片的内存占用跟模型有关，大盘模型用精细档峰值能到 2.7 GB。
 
 > [!CAUTION]
-> 🔒 The app has **no login of its own** and stores your Bambu token. Do not expose it directly to the internet. Keep it on your LAN, or put it behind a VPN or an authenticating reverse proxy.
+> 🔒 这个应用**自己没有登录功能**，还会保存你的拓竹 token。别直接暴露到公网。放在局域网里，或者套一层 VPN 或带认证的反向代理。
 
-## ⚙️ How it works
+## ⚙️ 工作原理
 
-| Step | What happens |
+| 步骤 | 发生了什么 |
 |---|---|
-| 🔎 Search and model pages | `api.bambulab.com` search and design endpoints, no auth |
-| ⬇️ Download | `design-service/instance/{id}/f3mf` with your Bambu token, then the signed CDN link |
-| 🔁 Preset swap | OrcaSlicer exports a full U1 config (machine, process, filaments) that replaces `Metadata/project_settings.config` in the 3MF |
-| 📐 Adaptive layers | Optional. The app computes the height profile from the mesh and writes it to `Metadata/layer_heights_profile.txt` in the 3MF |
-| 🔪 Slice | `OrcaSlicer --load-settings … --load-filaments … --slice N` |
-| 📡 Send | Moonraker upload, then `SET_PRINT_EXTRUDER_MAP` per colour, then start |
+| 🔎 搜索和模型页 | MakerWorld 的 `api.bambulab.com`（国际站）/ `api.bambulab.cn`（中国站）搜索与详情接口，Snapmaker Space 的 `api-models.snapmaker.com` 公开接口，都不需要登录 |
+| ⬇️ 下载 | MakerWorld 走 `design-service/instance/{id}/f3mf`（带拓竹 token）再跟随签名 CDN 链接；Snapmaker Space 先用自己的 token 调签名接口换取带时效的下载地址 |
+| 🔁 替换预设 | OrcaSlicer 导出一份完整的 U1 配置（机器、流程、耗材），覆盖 3MF 里的 `Metadata/project_settings.config` |
+| 📐 自适应层高 | 可选。应用从网格算出层高曲线，写进 3MF 的 `Metadata/layer_heights_profile.txt` |
+| 🔪 切片 | `OrcaSlicer --load-settings … --load-filaments … --slice N` |
+| 📡 发送 | Moonraker 上传，然后按颜色下发 `SET_PRINT_EXTRUDER_MAP`，最后启动 |
 
-Model colour N is printed as logical tool T(N-1), and the U1 firmware maps it to the toolhead you chose.
+模型的第 N 种颜色会用逻辑喷头 T(N-1) 打印，U1 固件再把它映射到你选的那个喷头。
 
-Local data lives in `./data`, which git ignores: the token in `settings.json` with mode 600, downloads, and jobs. The Bambu token is only sent to `api.bambulab.com`.
+**Snapmaker Space 的模型不需要替换预设**——它们自带完整的 U1 配置，直接切就行。个别模型的开头 G-code 用了 Snapmaker 定制版 Orca 的私有语法（`{if chamber_cooling_mode==...}`），标准 OrcaSlicer 解析不了，应用会只把这一项换成官方预设里的写法，其余配置原样保留。
 
-## 🩺 Troubleshooting
+本地数据在 `./data` 目录，已被 git 忽略：`settings.json` 里的 token（权限 600）、`snapmaker-auth.json`、下载缓存和任务记录。拓竹 token 只会发给 `api.bambulab.com` / `api.bambulab.cn`，Snapmaker 的 token 只会发给 `api.snapmaker.com`。
 
-- 🔑 **"Downloading needs your Bambu account"**: log in on the Settings page. Logins last about 90 days.
-- 🤖 **Captcha or rate limit**: Bambu sometimes challenges new devices. Open makerworld.com in your browser, then retry later.
-- 🚫 **Printer 401**: your network is not in Moonraker's `trusted_clients`. The stock config trusts 10.x, 172.16 to 31.x and 192.x.
-- 📷 **Camera**: stock firmware has no video stream. The camera rewrites a 1080p photo about 3.5 times a second after a wake call, which the app sends while you watch. Smooth video needs the community Extended Firmware.
+## 🩺 常见问题
 
-## ⚠️ Caveats
+- 🔑 **提示「下载需要拓竹账号」**：去设置页登录。登录状态大约能保持 90 天。
+- 🤖 **遇到验证码或限流**：拓竹有时会挑战新设备。用浏览器打开 makerworld.com 过一次，过一阵再试。
+- 🚫 **打印机返回 401**：你的网段不在 Moonraker 的 `trusted_clients` 里。出厂配置信任 10.x、172.16 到 31.x 和 192.x。
+- 📷 **摄像头**：出厂固件没有视频流。摄像头在收到唤醒请求后会以每秒约 3.5 次的频率刷新一张 1080p 照片，应用在你盯着画面时会持续发唤醒请求。要流畅视频得刷社区版扩展固件。
+- 🔑 **提示 Snapmaker token 已过期**：`data/snapmaker-auth.json` 里的 refresh 失效了，重新登录 `space.snapmaker.com` 复制一份新的填进去。注意要**先退出登录再重新登录**，光刷新页面浏览器不会更新 cookie。
 
-- MakerWorld has no public API. The endpoints used here are reverse-engineered and can break at any time.
-- MakerWorld's terms (section 9) forbid automated access. Keep this a personal, single-user tool, and respect each model's license.
-- This project is not affiliated with Bambu Lab, MakerWorld, Snapmaker or OrcaSlicer.
+## ⚠️ 注意事项
 
-## 🎨 Design
+- MakerWorld 没有公开 API。这里用的接口是逆向出来的，随时可能失效。
+- MakerWorld 的服务条款（第 9 条）禁止自动化访问。请把它当作个人、单用户的工具使用，并尊重每个模型的许可协议。
+- Snapmaker Space 同理，模型许可以模型页声明的为准，自用没问题，不要转售。
+- 本项目与拓竹（Bambu Lab）、MakerWorld、Snapmaker、OrcaSlicer 均无关联。
 
-The original screen designs (Claude Design canvas source) are in `docs/design/`.
+## 🎨 设计稿
 
-## 📄 License
+最初的界面设计源文件（Claude Design canvas）在 `docs/design/`。
+
+## 📄 许可证
 
 [MIT](LICENSE)
