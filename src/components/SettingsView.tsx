@@ -30,7 +30,39 @@ export function SettingsView({ initial, filaments }: { initial: PublicSettings; 
       <PrinterPanel s={s} onChange={setS} />
       <PowerPanel s={s} onChange={setS} />
       <ToolsPanel s={s} onChange={setS} filaments={filaments} />
+      <SessionPanel />
     </main>
+  );
+}
+
+function SessionPanel() {
+  const [busy, setBusy] = useState(false);
+
+  async function logout() {
+    setBusy(true);
+    try {
+      await fetch("/api/session/logout", { method: "POST" });
+      // 清掉 Service Worker 缓存，免得退出后还能翻到上一会话的页面。
+      if ("caches" in window) {
+        const keys = await caches.keys();
+        await Promise.all(keys.map((key) => caches.delete(key)));
+      }
+      window.location.href = "/login";
+    } catch {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <section className="panel">
+      <h2>登录状态</h2>
+      <p className="small muted" style={{ lineHeight: 1.5 }}>
+        当前已登录。退出后需要重新输入访问密码才能使用。
+      </p>
+      <button type="button" className="btn" disabled={busy} onClick={logout}>
+        {busy ? "退出中…" : "退出登录"}
+      </button>
+    </section>
   );
 }
 

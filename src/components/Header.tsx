@@ -67,6 +67,10 @@ export function Header() {
 
   const isActive = (href: string) => (href === "/" ? pathname === "/" || pathname.startsWith("/model") : pathname.startsWith(href));
 
+  // 登录页不显示主导航：点进去也只会被弹回来。注意必须在所有 hooks 之后返回，
+  // 提前 return 会让 hooks 数量不一致导致 React 报错。
+  if (pathname === "/login") return null;
+
   const counts: Record<string, [number, string]> = {
     "/saved": [favorites.length, "个收藏"],
     "/plate": [entries.length, "个在盘上"],
