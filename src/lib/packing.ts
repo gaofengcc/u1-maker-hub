@@ -24,9 +24,60 @@ export function footprint(bbox: number[], scale: number, rotation: number): [num
 export type Placement = { x: number; y: number } | null;
 
 /**
+ * Centres the placed group on the bed so small models sit in the middle instead of hugging the
+ * front-left corner. Returns the input untouched when centring would push a model off the bed or
+ * into the prime tower corner, so the result is always a legal layout.
+ */
+function centreOnBed(result: Placement[], sizes: { w: number; d: number }[]): Placement[] {
+  const left = U1_BED.minX + MARGIN;
+  const right = U1_BED.maxX - MARGIN;
+  const front = U1_BED.minY + MARGIN;
+  const back = U1_BED.maxY - MARGIN;
+
+  let minX = Infinity;
+  let maxX = -Infinity;
+  let minY = Infinity;
+  let maxY = -Infinity;
+  sizes.forEach((s, i) => {
+    const p = result[i];
+    if (!p) return;
+    minX = Math.min(minX, p.x - s.w / 2);
+    maxX = Math.max(maxX, p.x + s.w / 2);
+    minY = Math.min(minY, p.y - s.d / 2);
+    maxY = Math.max(maxY, p.y + s.d / 2);
+  });
+  if (!Number.isFinite(minX) || !Number.isFinite(minY)) return result;
+
+  const dx = (left + right) / 2 - (minX + maxX) / 2;
+  const dy = (front + back) / 2 - (minY + maxY) / 2;
+
+  // Stay inside the printable area.
+  if (minX + dx < left - 1e-6 || maxX + dx > right + 1e-6) return result;
+  if (minY + dy < front - 1e-6 || maxY + dy > back + 1e-6) return result;
+
+  // Never shift anything into the prime tower corner.
+  const clashes = sizes.some((s, i) => {
+    const p = result[i];
+    if (!p) return false;
+    const x = p.x + dx - s.w / 2;
+    const y = p.y + dy - s.d / 2;
+    return !(
+      x + s.w <= TOWER_ZONE.minX ||
+      x >= TOWER_ZONE.maxX ||
+      y + s.d <= TOWER_ZONE.minY ||
+      y >= TOWER_ZONE.maxY
+    );
+  });
+  if (clashes) return result;
+
+  return result.map((p) => (p ? { x: p.x + dx, y: p.y + dy } : null));
+}
+
+/**
  * Shelf packing, front to back: rows of models from the front-left corner, deepest first, skipping
  * the prime tower corner. Footprints marked `first` are placed before the others. Returns each
- * footprint's centre on the bed, or null when it does not fit.
+ * footprint's centre on the bed, or null when it does not fit. The finished group is then centred
+ * on the bed.
  */
 export function packPlate(sizes: { w: number; d: number; first?: boolean }[]): Placement[] {
   const left = U1_BED.minX + MARGIN;
@@ -57,7 +108,7 @@ export function packPlate(sizes: { w: number; d: number; first?: boolean }[]): P
     cursor = x + w + GAP;
     rowDepth = Math.max(rowDepth, d);
   }
-  return result;
+  return centreOnBed(result, sizes);
 }
 
 export type BedPlacement = { bed: number; x: number; y: number } | null;

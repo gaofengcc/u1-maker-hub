@@ -96,7 +96,7 @@ const zhCN = {
     cancel: "取消",
     loadError: "部分模型无法加载：{error}",
     tooBig: "模型太大，放不进 U1 热床：{models}。请缩小或旋转这些模型。",
-    placedAutomatically: "已自动放置 {count} 个物体，按前后顺序排列，并为左后方的擦拭塔留出空间。",
+    placedAutomatically: "已自动放置 {count} 个物体，居中排在热床上，并为左后方的擦拭塔留出空间。",
     overflowHint: "放不下的内容会放到下一块打印盘；每块打印盘分别打印。你可以在模型上选择打印盘，让它固定在指定盘上。",
     colorsHint: "颜色表示每种模型颜色使用的喷头；可在各个模型中修改。",
     sliceAndPrint: "切片并发送",

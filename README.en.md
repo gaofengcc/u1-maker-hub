@@ -13,6 +13,9 @@ U1 Maker Hub is a self-hosted web app: browse MakerWorld China, MakerWorld Inter
   <img src="docs/screenshots/search.png" alt="Cross-site search across three model sites at once" width="100%">
 </p>
 
+> [!NOTE]
+> **The interface is Chinese only.** This fork localises the whole UI to Simplified Chinese and ships a single `zh-CN` message catalogue, which is why the screenshots below are in Chinese. There is no locale switcher; adding an `en-US` catalogue is a straightforward contribution if you want one.
+
 ## 🔀 Multiple sites: what makes this fork different
 
 Upstream only talks to MakerWorld. This version talks to three sources:
