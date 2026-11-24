@@ -5,60 +5,99 @@
 > [!WARNING]
 > 🚧 **This project is vibe-coded.** It was built quickly, with heavy help from an AI coding assistant, for my own personal use with my own printer. Expect bugs, rough edges and missing checks. It works for me, but it has not been hardened or tested on other setups. I'm releasing it in case it helps other Snapmaker U1 owners, and I will keep improving it. Issues and pull requests are welcome.
 
-**🌍 From model sites to your Snapmaker U1 in a few taps. ✨**
+**🌍 Three model sites, one interface, a few taps to your Snapmaker U1.**
 
-U1 Maker Hub is a self-hosted web app that lets you browse model sites, re-slice any model for the **Snapmaker U1** with tuned presets, and send it straight to the printer, from your phone or your desktop. 📱💻
+U1 Maker Hub is a self-hosted web app: browse MakerWorld China, MakerWorld International and Snapmaker Space International side by side, re-slice any model for the **Snapmaker U1** with tuned presets, and send it straight to the printer. Works on your phone and your desktop.
 
 <p align="center">
-  <img src="docs/screenshots/explore.png" alt="Explore models" width="100%">
+  <img src="docs/screenshots/search.png" alt="Cross-site search across three model sites at once" width="100%">
 </p>
+
+## 🔀 Multiple sites: what makes this fork different
+
+Upstream only talks to MakerWorld. This version talks to three sources:
+
+| Source | Internal id | Browse / search | Download | Ships U1 profile |
+|---|---|---|---|---|
+| MakerWorld China | `mw-cn` | no account | Bambu account | no, preset swap needed |
+| MakerWorld International | `mw-intl` | no account | Bambu account | no, preset swap needed |
+| Snapmaker Space International | `sm-intl` | no account | Snapmaker token | **yes, slice as-is** |
+
+### Browsing: pick one site
+
+A dropdown at the top switches between sources. Sorting, time range and the random draw all apply to the current site only — there is no cross-site feed, because the three sites do not agree on what "popular" or "recent" even means.
+
+### Searching: all three at once
+
+Type a keyword and the behaviour changes:
+
+- **All three are queried in parallel**, and results are interleaved one per source: China, International, Snapmaker, repeat
+- **Source chips** above the grid let you include or exclude a source. All three start on, and at least one stays on
+- **The sort control disappears** — there is no honest global ordering. MakerWorld returns its own relevance ranking, Snapmaker returns newest-only, so stitching them into a single "sorted" list would be fiction. Search results follow each site's own order, interleaved
+- **A failing source does not break the page**; a banner names whichever site is unavailable
+
+A three-source search returned 8,397 results in about 1.19 seconds in testing.
+
+> [!NOTE]
+> Result cards currently carry **no source badge**. You can see Chinese and English titles mixed together (`浪里小白龙` next to `Infinity Serpent`), but a card alone does not tell you where it came from. Cross-site ID collisions are already handled with prefixed keys (`mw-cn:436580` vs `sm-intl:53712` never swallow each other) — the UI just does not draw the label yet.
 
 ## 🤔 Why
 
-Model sites have huge libraries, but most models come with Bambu Lab print profiles. Printing them on a Snapmaker U1 means downloading the 3MF, opening a slicer, swapping the printer, process and filament settings, mapping colours to toolheads, exporting the G-code and uploading it. U1 Maker Hub does all of that in one screen: pick a model, pick a preset, press **Print**.
+Model sites have big libraries, but most MakerWorld models ship with Bambu Lab print profiles. Printing them on a Snapmaker U1 means downloading the 3MF, opening a slicer, swapping the printer, process and filament settings, mapping colours to toolheads, exporting the G-code and uploading it. U1 Maker Hub does all of that in one screen: pick a model, pick a preset, press the button.
+
+Snapmaker Space models are easier — most carry a complete four-toolhead U1 configuration already and slice as-is.
 
 ## ✨ Features
 
 ### 🔎 Find models
 
-- 🌐 **Three sources:** MakerWorld China, MakerWorld International and Snapmaker Space International. Switch between them with a dropdown while browsing.
-- 🔀 **Cross-source search:** type a keyword and all three are searched at once, with results interleaved per source. The chips above the grid let you include or exclude sources.
-- ❤️ **Saved models:** keep favourites to print later.
-- 📤 **Uploads:** bring your own STL or 3MF files.
+- 🌐 **Three sources** — switch them while browsing, search them together, see above
+- ❤️ **Saved models:** keep favourites to print later
+- 📤 **Uploads:** bring your own STL or 3MF files
 
 ### 🛠️ Prepare the print
 
-- 🎛️ **Tuned U1 presets:** Fast & clean, Standard and Fine detail. The Bambu settings in the 3MF are replaced with a complete U1 configuration; geometry, plates and colour painting are kept.
-- 🧑‍🎓 **Beginner-friendly options:** supports, brim, size and orientation, without slicer jargon.
-- 📐 **Adaptive layer heights:** computed from the slope of the mesh, like OrcaSlicer's "Adaptive" button, because OrcaSlicer's command line ignores that setting.
-- 🎨 **Multi-colour:** choose which of the U1's four toolheads prints each colour. More than four colours can share toolheads.
-- 🧩 **Multi-model plates:** combine several models and copies on one plate, with automatic packing onto as many plates as needed.
-- 👀 **Preview:** 3D bed view before slicing and toolpath view after slicing, with print time, filament use and cost.
+- 🎛️ **Tuned U1 presets:** Fast & clean, Standard and Fine detail. MakerWorld 3MFs get their Bambu settings replaced with a complete U1 configuration; geometry, plates and colour painting are kept
+- 🧑‍🎓 **Beginner-friendly options:** supports, brim, size and orientation, without slicer jargon
+- 📐 **Adaptive layer heights:** computed from the slope of the mesh, like OrcaSlicer's "Adaptive" button, because OrcaSlicer's command line ignores that setting
+- 🎨 **Multi-colour:** choose which of the U1's four toolheads prints each colour; more than four colours can share toolheads
+- 🧩 **Multi-model plates:** combine several models and copies on one plate, with automatic packing onto as many plates as needed
+- 👀 **Preview:** 3D bed view before slicing and toolpath view after slicing, with print time, filament use and cost
 
 ### 🚀 Print and monitor
 
-- ⚡ **One-click send:** slices with OrcaSlicer, uploads to the U1 through Moonraker, maps colours to toolheads and starts the print.
-- 📷 **My printer:** live state, camera, temperatures, the four toolheads, pause, resume, cancel, speed, fan and light.
-- 🔌 **Printer power (optional):** turn the printer's smart plug on and off through Home Assistant. Turning off is blocked while a print is running.
-- 📲 **Installable PWA:** mobile-first layout, add it to your phone's home screen.
+- ⚡ **One-click send:** slices with OrcaSlicer, uploads to the U1 through Moonraker, maps colours to toolheads and starts the print
+- 📷 **My printer:** live state, camera, temperatures, the four toolheads, pause, resume, cancel, speed, fan and light
+- 🔌 **Printer power (optional):** turn the printer's smart plug on and off through Home Assistant; turning off is blocked while a print is running
+- 📲 **Installable PWA:** mobile-first layout, add it to your phone's home screen
 
 ## 📸 Screenshots
 
-| Model page: profile, U1 preset and options | Printer: toolheads, camera and live controls |
+| Browsing: source dropdown at the top | Model page: Snapmaker model with its own profile |
 |---|---|
-| ![Model page](docs/screenshots/model.png) | ![Printer page](docs/screenshots/printer.png) |
+| ![Explore](docs/screenshots/explore.png) | ![Model page](docs/screenshots/model.png) |
 
-| Settings | On your phone |
+| Printer: toolheads, camera and live controls | Settings |
 |---|---|
-| ![Settings page](docs/screenshots/settings.png) | <img src="docs/screenshots/mobile-explore.png" alt="Explore on a phone" width="32%"> <img src="docs/screenshots/mobile-model.png" alt="Model page on a phone" width="32%"> <img src="docs/screenshots/mobile-printer.png" alt="Printer page on a phone" width="32%"> |
+| ![Printer page](docs/screenshots/printer.png) | ![Settings page](docs/screenshots/settings.png) |
+
+On a phone:
+
+<p align="center">
+  <img src="docs/screenshots/mobile-explore.png" alt="Explore on a phone" width="32%">
+  <img src="docs/screenshots/mobile-model.png" alt="Model page on a phone" width="32%">
+  <img src="docs/screenshots/mobile-printer.png" alt="Printer page on a phone" width="32%">
+</p>
+
+> The printer in these screenshots is the bundled mock (`pnpm mock-printer`), which is why the camera says unavailable. A real printer shows video after installing the community Extended Firmware.
 
 ## 📋 Requirements
 
-- 🧠 **OrcaSlicer 2.4 or newer.** On macOS: `brew install --cask orcaslicer`. On Linux, see `deploy/setup-lxc.sh`. Snapmaker Orca's command line crashes on recent Bambu files, so it is not used.
-- 🟢 **Node 20 or newer**, and pnpm.
-- 👤 **A Bambu Lab account** to download MakerWorld files. Search works without one.
-- 🖨️ **A Snapmaker U1** on the same network. Its Moonraker API must accept this computer; see Troubleshooting.
-- 🔑 **A Snapmaker Space token** to download from that source, kept in `data/snapmaker-auth.json` (see below).
+- 🧠 **OrcaSlicer 2.4 or newer.** On macOS: `brew install --cask orcaslicer`. On Linux, see `deploy/setup-lxc.sh`. Snapmaker Orca's command line crashes on recent Bambu files, so it is not used
+- 🟢 **Node 20 or newer**, and pnpm
+- 👤 **A Bambu Lab account** to download MakerWorld files. Search works without one
+- 🖨️ **A Snapmaker U1** on the same network. Its Moonraker API must accept this computer; see Troubleshooting
+- 🔑 **A Snapmaker Space token** to download from that source, kept in `data/snapmaker-auth.json`
 
 ## ⚡ Quick start
 
@@ -69,11 +108,11 @@ pnpm dev            # http://localhost:3000
 
 Then open **Settings**:
 
-1. Log in with your Bambu account. Email and password work, plus an emailed or authenticator code. You can also paste the `token` cookie from makerworld.com.
-2. Enter the printer address, for example `192.168.1.42`, and press **Test & save**.
-3. Set what is loaded in T1 to T4, or press **Read from printer**.
-4. Optional: set your Home Assistant address, the plug's entity id and a long-lived access token to get a power button.
-5. Optional: for Snapmaker Space models, put the `access` and `refresh` tokens into `data/snapmaker-auth.json` (format below). The app refreshes the access token by itself, so you only touch this once.
+1. Log in with your Bambu account. Email and password work, plus an emailed or authenticator code; you can also paste the `token` cookie from makerworld.com
+2. Enter the printer address, for example `192.168.1.42`, and press **Test & save**
+3. Set what is loaded in T1 to T4, or press **Read from printer**
+4. Optional: set your Home Assistant address, the plug's entity id and a long-lived access token to get a power button
+5. Optional: for Snapmaker Space models, put the tokens into `data/snapmaker-auth.json` (below)
 
 🧪 To work without the printer, run a fake U1 and use `localhost:7125` as the printer address:
 
@@ -95,7 +134,7 @@ Sign in to `space.snapmaker.com`, open DevTools → Application → Cookies, and
 Save it as `data/snapmaker-auth.json` with mode `600`. That directory is git-ignored.
 
 > [!NOTE]
-> The access token lasts 24 hours and the refresh token about 30 days. The app swaps the access token using the refresh token before it expires and writes the rotated pair back to the same file. You only need to fill this in again when the refresh token itself dies, for example after signing in somewhere else, or if 30 days pass without use.
+> The access token lasts 24 hours and the refresh token about 30 days. The app swaps the access token before it expires and writes the rotated pair back to the same file, so normally you only fill this in once. You need to do it again only when the refresh token itself dies — after signing in somewhere else, or after 30 days without use.
 
 ## 🐳 Docker
 
@@ -106,9 +145,9 @@ docker compose up -d --build      # http://<host>:3000
 docker compose logs -f
 ```
 
-Settings, the Bambu token, favourites, downloads and jobs are kept in the `u1-data` volume. To pick another OrcaSlicer release, change `ORCA_VERSION` in `docker-compose.yml` and rebuild.
+Settings, tokens, favourites, downloads and jobs are kept in the `u1-data` volume. To pick another OrcaSlicer release, change `ORCA_VERSION` in `docker-compose.yml` and rebuild.
 
-⚠️ The image is `linux/amd64` only, because OrcaSlicer publishes no ARM Linux build. It runs on ARM hosts (Apple Silicon, Raspberry Pi) through emulation, but slicing becomes several times slower; an x86_64 machine is strongly recommended.
+⚠️ The image is `linux/amd64` only, because OrcaSlicer publishes no ARM Linux build. It runs on ARM hosts through emulation, but slicing becomes several times slower; an x86_64 machine is strongly recommended.
 
 ### 📊 Resources
 
@@ -116,7 +155,7 @@ Slicing is the only heavy part; the web app itself idles at about 140 MB. OrcaSl
 
 | | Minimum | Recommended |
 |---|---|---|
-| 🧮 CPU | 1 core | 2 to 4 cores. OrcaSlicer is multi-threaded: more cores mean faster slicing, not more capacity |
+| 🧮 CPU | 1 core | 2 to 4 cores. OrcaSlicer is multi-threaded: more cores mean faster slicing |
 | 🧠 RAM | 2 GB | **3 GB + 512 MB swap** (the compose default). A 5-colour model peaks at about 600 MB; a large vase-mode model peaks at 1.6 GB on Fast and 2.7 GB on Fine detail |
 | 💾 Disk | 3 GB | 10 GB. The image is about 600 MB to download and 1.7 GB on disk; downloads and jobs grow over time in the `u1-data` volume, clean it up now and then |
 
@@ -138,44 +177,44 @@ The app is meant to run on a small always-on machine on your home network. `depl
    DEPLOY_HOST=root@<server-ip> deploy/deploy.sh
    ```
 
-3. Open `http://<server-ip>:3000` and configure it in **Settings**.
+3. Open `http://<server-ip>:3000` and configure it in **Settings**
 
-Data lives in `/var/lib/u1-maker-hub` on the server. Give it about 3 GB of RAM: slicer memory depends on the model, and a large model on Fine detail can peak around 2.7 GB.
+Data lives in `/var/lib/u1-maker-hub`. Give it about 3 GB of RAM: slicer memory depends on the model, and a large model on Fine detail can peak around 2.7 GB.
 
 > [!CAUTION]
-> 🔒 The app has **no login of its own** and stores your Bambu token. Do not expose it directly to the internet. Keep it on your LAN, or put it behind a VPN or an authenticating reverse proxy.
+> 🔒 The app has **no login of its own** beyond an optional app password, and stores your Bambu token. Do not expose it directly to the internet. Keep it on your LAN, or put it behind a VPN or an authenticating reverse proxy.
 
 ## ⚙️ How it works
 
 | Step | What happens |
 |---|---|
-| 🔎 Search and model pages | MakerWorld `api.bambulab.com` (International) and `api.bambulab.cn` (China) search and design endpoints, plus the public `api-models.snapmaker.com` endpoints, none of which need auth |
-| ⬇️ Download | MakerWorld uses `design-service/instance/{id}/f3mf` with your Bambu token, then the signed CDN link. Snapmaker Space exchanges its token for a time-limited signed URL first |
-| 🔁 Preset swap | OrcaSlicer exports a full U1 config (machine, process, filaments) that replaces `Metadata/project_settings.config` in the 3MF |
+| 🔎 Search | MakerWorld through `api.bambulab.cn` / `api.bambulab.com`, Snapmaker through `api-models.snapmaker.com` — none of them need auth |
+| ⬇️ Download | MakerWorld uses `design-service/instance/{id}/f3mf` with your Bambu token, then the signed CDN link. Snapmaker exchanges its token for a time-limited signed URL first |
+| 🔁 Preset swap | MakerWorld only. OrcaSlicer exports a full U1 config (machine, process, filaments) that replaces `Metadata/project_settings.config` in the 3MF |
+| 🩹 Conditional G-code | A few Snapmaker models carry `{if …}{endif}` blocks, an extension of Snapmaker's Orca build. Stock OrcaSlicer cannot parse an unknown variable name and aborts with `return -100`. The app replaces only the offending G-code keys with the official U1 preset's version, leaves every other setting untouched, and repacks before slicing |
 | 📐 Adaptive layers | Optional. The app computes the height profile from the mesh and writes it to `Metadata/layer_heights_profile.txt` in the 3MF |
 | 🔪 Slice | `OrcaSlicer --load-settings … --load-filaments … --slice N` |
 | 📡 Send | Moonraker upload, then `SET_PRINT_EXTRUDER_MAP` per colour, then start |
 
 Model colour N is printed as logical tool T(N-1), and the U1 firmware maps it to the toolhead you chose.
 
-**Snapmaker Space models skip the preset swap.** They ship a complete U1 configuration already, so the 3MF is sliced as-is. A few of them carry custom start G-code that only Snapmaker's Orca build understands (`{if chamber_cooling_mode==...}`), which stock OrcaSlicer cannot parse; for those, only that one key is replaced with the official preset's version and everything else is kept.
-
 Local data lives in `./data`, which git ignores: the token in `settings.json` with mode 600, `snapmaker-auth.json`, downloads, and jobs. The Bambu token is only sent to `api.bambulab.com` / `api.bambulab.cn`, and the Snapmaker token only to `api.snapmaker.com`.
 
 ## 🩺 Troubleshooting
 
-- 🔑 **"Downloading needs your Bambu account"**: log in on the Settings page. Logins last about 90 days.
-- 🤖 **Captcha or rate limit**: Bambu sometimes challenges new devices. Open makerworld.com in your browser, then retry later.
-- 🚫 **Printer 401**: your network is not in Moonraker's `trusted_clients`. The stock config trusts 10.x, 172.16 to 31.x and 192.x.
-- 📷 **Camera**: stock firmware has no video stream. The camera rewrites a 1080p photo about 3.5 times a second after a wake call, which the app sends while you watch. Smooth video needs the community Extended Firmware.
-- 🔑 **Snapmaker token expired**: the refresh token in `data/snapmaker-auth.json` is dead. Sign in to `space.snapmaker.com` again and paste a fresh pair. Sign out first and sign back in; reloading the page does not refresh the cookies.
+- 🔑 **"Downloading needs your Bambu account"**: log in on the Settings page. Logins last a long while
+- 🤖 **Captcha or rate limit**: Bambu sometimes challenges new devices. Open makerworld.com in your browser, then retry later
+- 🚫 **Printer 401**: your network is not in Moonraker's `trusted_clients`. The stock config trusts 10.x, 172.16 to 31.x and 192.x
+- 📷 **Camera stays black**: stock firmware has no video stream, only a still photo refreshed a few times a second. Smooth video needs the community Extended Firmware
+- 🔑 **Snapmaker token expired**: the refresh token in `data/snapmaker-auth.json` is dead. Sign out of `space.snapmaker.com` and sign back in, then paste a fresh pair — reloading the page does not refresh the cookies
+- 🔪 **A Snapmaker model fails to slice**: if the log shows `return -100` or `Not a variable name`, it carries conditional G-code the app could not rewrite. Open an issue with the model id
 
 ## ⚠️ Caveats
 
-- MakerWorld has no public API. The endpoints used here are reverse-engineered and can break at any time.
-- MakerWorld's terms (section 9) forbid automated access. Keep this a personal, single-user tool, and respect each model's license.
-- The same goes for Snapmaker Space: check the license on each model page. Personal use is fine, reselling is not.
-- This project is not affiliated with Bambu Lab, MakerWorld, Snapmaker or OrcaSlicer.
+- MakerWorld has no public API. The endpoints used here are reverse-engineered and can break at any time
+- MakerWorld's terms (section 9) forbid automated access. Keep this a personal, single-user tool
+- The same goes for Snapmaker Space: check the license on each model page. Personal use is fine, reselling is not
+- This project is not affiliated with Bambu Lab, MakerWorld, Snapmaker or OrcaSlicer
 
 ## 🎨 Design
 

@@ -4,7 +4,7 @@ import { publicSettings } from "@/lib/store.ts";
 import { u1Filaments } from "@/lib/profiles.ts";
 import { SettingsView } from "@/components/SettingsView";
 
-export const metadata = { title: "Settings · U1 Maker Hub" };
+export const metadata = { title: "设置 · U1 模型工坊" };
 
 export default function SettingsPage() {
   return (

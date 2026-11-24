@@ -154,19 +154,86 @@ export type SliceResult = {
   layers?: { min: number; max: number; applied: boolean };
 };
 
+/**
+ * Snapmaker 定制版 Orca 允许在 G-code 里写 `{if …}{endif}` 条件块，标准 OrcaSlicer 不认识，
+ * 会报 "Not a variable name" 然后 return -100，整盘切不出来。
+ */
+const CONDITIONAL_GCODE = /\{\s*(?:if|elsif|else|endif)\b/;
+
+/** 可能带条件语法的 G-code 键。 */
+const GCODE_KEYS = [
+  "machine_start_gcode",
+  "machine_end_gcode",
+  "change_filament_gcode",
+  "layer_change_gcode",
+  "before_layer_change_gcode",
+] as const;
+
+/**
+ * 少数 Snapmaker Space 模型是用 Snapmaker 定制版 Orca 存的，配置里带着标准 OrcaSlicer 解析不了的
+ * 条件语法。这里只把出问题的 G-code 键换成官方 U1 预设的写法，其余配置一个不动，改完重新打包。
+ *
+ * 代价是模型作者写的定制逻辑会丢，但标准 OrcaSlicer 本来就读不了那些语法，
+ * 不换就是这个模型根本切不出来。
+ */
+async function normalizeSnapmakerProject(
+  input: string,
+  workDir: string,
+  onLog?: (line: string) => void,
+): Promise<string> {
+  const zip = await JSZip.loadAsync(fs.readFileSync(input));
+  const entry = zip.file("Metadata/project_settings.config");
+  if (!entry) return input;
+
+  let config: Record<string, unknown>;
+  try {
+    config = JSON.parse(await entry.async("string")) as Record<string, unknown>;
+  } catch {
+    // 解析不了就原样交给切片器，让它自己报错。
+    return input;
+  }
+
+  const offending = GCODE_KEYS.filter(
+    (key) => typeof config[key] === "string" && CONDITIONAL_GCODE.test(config[key] as string),
+  );
+  if (!offending.length) return input;
+
+  const official = flattenPreset(U1_MACHINE);
+  const patched: string[] = [];
+  for (const key of offending) {
+    const replacement = official[key];
+    // 官方预设自己也是条件语法时没法修，留给切片器报错，别伪装成功。
+    if (typeof replacement !== "string" || CONDITIONAL_GCODE.test(replacement)) continue;
+    config[key] = replacement;
+    patched.push(key);
+  }
+  if (!patched.length) return input;
+
+  zip.file("Metadata/project_settings.config", JSON.stringify(config));
+  const output = path.join(workDir, "u1-normalized.3mf");
+  fs.writeFileSync(output, await zip.generateAsync({ type: "nodebuffer", compression: "DEFLATE" }));
+  const kept = Object.keys(config).length - patched.length;
+  onLog?.(
+    `[预处理] 模型的 ${patched.join("、")} 用了 Snapmaker 私有条件语法，标准 OrcaSlicer 解析不了，` +
+      `已换成官方 U1 预设的写法；其余 ${kept} 项保持原样。`,
+  );
+  return output;
+}
+
 /** 使用 Snapmaker Space 配置自带的 U1 预设切片，并保留供打印机上传的完整切片包。 */
 export async function sliceSnapmakerProfile(req: Pick<SliceRequest, "input" | "workDir" | "onLog">): Promise<SliceResult> {
   const outDir = path.join(req.workDir, "out");
   fs.mkdirSync(outDir, { recursive: true });
   const exportName = "u1.gcode.3mf";
   const [bin, ...prefix] = process.platform === "linux" ? ["xvfb-run", "-a", SLICER_BIN] : [SLICER_BIN];
+  const input = await normalizeSnapmakerProject(req.input, req.workDir, req.onLog);
   const log = await run(bin, [
     ...prefix,
     "--allow-newer-file",
     "--slice", "0",
     "--outputdir", outDir,
     "--export-3mf", exportName,
-    req.input,
+    input,
   ], req.workDir, req.onLog);
   const exported3mf = path.join(outDir, exportName);
   if (!fs.existsSync(exported3mf)) throw new SlicerError("OrcaSlicer 未生成 .gcode.3mf 切片包。");

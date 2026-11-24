@@ -4,7 +4,7 @@ import { publicSettings } from "@/lib/store.ts";
 import { DEFAULT_OPTIONS, PRINT_MODES } from "@/lib/slicer.ts";
 import { UploadView } from "@/components/UploadView";
 
-export const metadata = { title: "Upload · U1 Maker Hub" };
+export const metadata = { title: "上传模型 · U1 模型工坊" };
 
 export default function UploadPage(props: PageProps<"/upload">) {
   return (
