@@ -12,7 +12,7 @@ import { loadPreviewMesh, loadUploadMesh, meshBox, type MeshData } from "@/lib/p
 import { usePlate } from "@/lib/usePlate";
 import { BedViewer, type BedPart, type FacePick } from "./BedViewer";
 import { layFaceFlat, OrientControls } from "./OrientControls";
-import { JobProgress, PresetPicker, shortPreset, type Mode } from "./PrintSetup";
+import { AutoPrintToggle, JobProgress, PresetPicker, shortPreset, type Mode } from "./PrintSetup";
 import { PrintOptionsPanel } from "./PrintOptions";
 import { useCreatorSupports, useSupportsOption } from "@/lib/useCreatorSupports";
 import { DownloadIcon, SendIcon } from "./Icons";
@@ -40,6 +40,8 @@ export function PlateView({ settings, modes, defaults }: Props) {
   const options = supportsOption.value;
   const [job, setJob] = useState<Job | null>(null);
   const [submitError, setSubmitError] = useState<string | null>(null);
+  // Off by default: the plate goes to the U1 and waits there, so nobody starts a print by accident.
+  const [autoPrint, setAutoPrint] = useState(false);
   /** The U1 plate shown in the layout preview (1-based). */
   const [viewBed, setViewBed] = useState(1);
   /** The model whose next clicked face is laid on the bed. */
@@ -125,7 +127,7 @@ export function PlateView({ settings, modes, defaults }: Props) {
   const start = async (send: boolean) => {
     setSubmitError(null);
     try {
-      setJob(await api<Job>("/api/plate/print", { method: "POST", body: JSON.stringify({ mode, options, send }) }));
+      setJob(await api<Job>("/api/plate/print", { method: "POST", body: JSON.stringify({ mode, options, send, print: send && autoPrint }) }));
     } catch (e) {
       setSubmitError((e as Error).message);
     }
@@ -135,7 +137,18 @@ export function PlateView({ settings, modes, defaults }: Props) {
     if (!job) return;
     setSubmitError(null);
     try {
-      setJob(await api<Job>(`/api/jobs/${job.id}/send`, { method: "POST", body: JSON.stringify({ plate }) }));
+      setJob(await api<Job>(`/api/jobs/${job.id}/send`, { method: "POST", body: JSON.stringify({ plate, print: autoPrint }) }));
+    } catch (e) {
+      setSubmitError((e as Error).message);
+    }
+  };
+
+  // Start a plate the printer already has, without uploading it again.
+  const startExisting = async (plate = 1) => {
+    if (!job) return;
+    setSubmitError(null);
+    try {
+      setJob(await api<Job>(`/api/jobs/${job.id}/print`, { method: "POST", body: JSON.stringify({ plate }) }));
     } catch (e) {
       setSubmitError((e as Error).message);
     }
@@ -157,7 +170,7 @@ export function PlateView({ settings, modes, defaults }: Props) {
         </section>
         {job && (
           <section className="panel" style={{ maxWidth: 560, marginTop: 16 }}>
-            <JobProgress job={job} onSend={sendExisting} printerConfigured={settings.printerConfigured} tools={settings.tools} />
+            <JobProgress job={job} onSend={sendExisting} onPrint={() => startExisting(1)} printerConfigured={settings.printerConfigured} tools={settings.tools} />
           </section>
         )}
       </main>
@@ -263,6 +276,7 @@ export function PlateView({ settings, modes, defaults }: Props) {
             <button type="button" className="btn btn-primary btn-lg" disabled={busy || !fits || !settings.printerConfigured} onClick={() => start(true)}>
               <SendIcon size={20} /> {bedCount > 1 ? t("plate.slicePlatesAndPrint", { count: bedCount }) : t("plate.sliceAndPrint")}
             </button>
+            <AutoPrintToggle value={autoPrint} onChange={setAutoPrint} />
             {bedCount > 1 && <p className="small muted">{t("plate.oneAtTime")}</p>}
             {!settings.printerConfigured && (
               <p className="small muted">
@@ -273,9 +287,9 @@ export function PlateView({ settings, modes, defaults }: Props) {
               {bedCount > 1 ? t("plate.slicePlatesOnly", { count: bedCount }) : t("plate.sliceOnly")}
             </button>
             {submitError && <div className="notice error">{submitError}</div>}
-            {job && <JobProgress job={job} onSend={() => sendExisting(1)} printerConfigured={settings.printerConfigured} tools={settings.tools} />}
+            {job && <JobProgress job={job} onSend={() => sendExisting(1)} onPrint={() => startExisting(1)} printerConfigured={settings.printerConfigured} tools={settings.tools} />}
             {job && job.plates && job.plates.length > 1 && (
-              <JobPlates job={job} busy={busy} printerConfigured={settings.printerConfigured} tools={settings.tools} onSend={sendExisting} />
+              <JobPlates job={job} busy={busy} printerConfigured={settings.printerConfigured} tools={settings.tools} onSend={sendExisting} onStart={startExisting} />
             )}
           </section>
         </aside>
@@ -291,12 +305,14 @@ function JobPlates({
   printerConfigured,
   tools,
   onSend,
+  onStart,
 }: {
   job: Job;
   busy: boolean;
   printerConfigured: boolean;
   tools: ToolLoad[];
   onSend: (plate: number) => void;
+  onStart: (plate: number) => void;
 }) {
   return (
     <ol className="job-plates" aria-label={t("plate.plates")}>
@@ -306,15 +322,20 @@ function JobPlates({
             <strong>{t("plate.plate", { number: i + 1 })}</strong>
             <span className="small muted">
               {duration(p.stats.seconds)} · {p.stats.grams != null ? `${p.stats.grams.toFixed(1)} g` : "—"} · {euros(slicedPrice(p.stats, job.filamentToTool, tools))}
-              {p.remoteName ? ` · ${t("plate.sent")}` : ""}
+              {p.remoteName ? ` · ${p.started ? t("plate.sent") : t("plate.waiting")}` : ""}
             </span>
           </div>
           <div style={{ display: "flex", gap: 6, flexWrap: "wrap", justifyContent: "flex-end" }}>
             <a className="btn btn-sm" href={`/api/jobs/${job.id}/file?kind=gcode&plate=${i + 1}`} aria-label={t("plate.downloadPlate", { number: i + 1 })}>
               <DownloadIcon size={14} /> G-code
             </a>
-            <button type="button" className={`btn btn-sm${p.remoteName ? "" : " btn-primary"}`} disabled={busy || !printerConfigured} onClick={() => onSend(i + 1)}>
-              <SendIcon size={14} /> {p.remoteName ? t("plate.printAgain") : t("plate.printPlate", { number: i + 1 })}
+            <button
+              type="button"
+              className={`btn btn-sm${p.remoteName ? "" : " btn-primary"}`}
+              disabled={busy || !printerConfigured}
+              onClick={() => (p.remoteName && !p.started ? onStart(i + 1) : onSend(i + 1))}
+            >
+              <SendIcon size={14} /> {p.remoteName ? (p.started ? t("plate.printAgain") : t("plate.startPrint")) : t("plate.printPlate", { number: i + 1 })}
             </button>
           </div>
         </li>

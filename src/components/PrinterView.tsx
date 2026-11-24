@@ -409,11 +409,13 @@ function Slider({ label, unit, min, max, step, value, onCommit }: { label: strin
 }
 
 /**
- * Fluidd 完整控制台：经 Cloudflare 隧道（print.peaklair.com）反代到打印机，
- * 前置 nginx Basic Auth。iframe 默认收起，避免每次进页面都加载一次重资源。
+ * Fluidd 完整控制台：地址由 NEXT_PUBLIC_FLUIDD_URL 指定（可指向自建的反向代理），
+ * 未配置时不渲染整个区块。iframe 默认收起，避免每次进页面都加载一次重资源。
  */
 function FluiddConsole() {
   const [open, setOpen] = useState(false);
+  const fluiddUrl = process.env.NEXT_PUBLIC_FLUIDD_URL ?? "";
+  if (!fluiddUrl) return null;
   return (
     <section className="panel" style={{ marginTop: 20 }}>
       <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
@@ -423,7 +425,7 @@ function FluiddConsole() {
         </button>
         <a
           className="btn"
-          href="https://print.peaklair.com"
+          href={fluiddUrl}
           target="_blank"
           rel="noreferrer"
           style={{ textDecoration: "none" }}
@@ -437,7 +439,7 @@ function FluiddConsole() {
       </p>
       {open && (
         <iframe
-          src="https://print.peaklair.com"
+          src={fluiddUrl}
           title="Fluidd 控制台"
           allow="fullscreen"
           style={{

@@ -24,6 +24,8 @@ type Body = {
   transform?: { scale?: number; rotation?: number; orient?: unknown };
   filamentToTool?: number[];
   send?: boolean;
+  /** Start the print right after the upload (default true). */
+  print?: boolean;
   site?: string;
 };
 
@@ -66,6 +68,7 @@ export async function POST(req: Request) {
       transform: cleanTransform(b.transform),
       filamentToTool: Array.isArray(b.filamentToTool) ? b.filamentToTool.map(Number) : [],
       send: Boolean(b.send),
+      print: b.print !== false,
       site: resolveSite(b.site),
     });
     return NextResponse.json(job, { status: 201 });

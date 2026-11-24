@@ -42,3 +42,7 @@ next-env.d.ts
 
 # local data: tokens, downloads, jobs
 /data
+
+# 本地调试脚本（含本地地址，不提交）
+/scripts/thumb-test.ts
+/scripts/dump.ts

@@ -236,7 +236,7 @@ export function ModelView({ design, settings, modes, defaults, filamentPresets }
             <DownloadIcon size={16} /> {t("model.original3mf")}
           </a>
         }
-        slice={(s, send) =>
+        slice={(s, opts) =>
           api<Job>("/api/jobs", {
             method: "POST",
             body: JSON.stringify({
@@ -249,7 +249,8 @@ export function ModelView({ design, settings, modes, defaults, filamentPresets }
               plate: printedPlate,
               transform: s.transform,
               filamentToTool: s.filamentToTool,
-              send,
+              send: opts.send,
+              print: opts.print,
             }),
           })
         }

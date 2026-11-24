@@ -5,7 +5,7 @@ import { DEFAULT_OPTIONS, PRINT_MODES, type PrintMode, type PrintOptions } from 
 import { errorResponse, readJson } from "@/lib/http.ts";
 import { resolveSite } from "@/lib/sites.ts";
 
-type Body = { mode?: string; options?: Partial<PrintOptions>; send?: boolean; site?: string };
+type Body = { mode?: string; options?: Partial<PrintOptions>; send?: boolean; print?: boolean; site?: string };
 
 /** Slices everything on the plate, on as many U1 plates as needed, and optionally sends the first one to the printer. */
 export async function POST(req: Request) {
@@ -40,6 +40,7 @@ export async function POST(req: Request) {
       })),
       filamentToTool: [0, 1, 2, 3],
       send: Boolean(b.send),
+      print: b.print !== false,
     });
     return NextResponse.json(job, { status: 201 });
   } catch (err) {

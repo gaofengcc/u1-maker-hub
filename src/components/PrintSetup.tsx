@@ -75,7 +75,7 @@ type Props = {
   notice?: ReactNode;
   /** Buttons next to "Slice only" (the original file). */
   extraActions?: ReactNode;
-  slice: (setup: Setup, send: boolean) => Promise<Job>;
+  slice: (setup: Setup, options: { send: boolean; print: boolean }) => Promise<Job>;
   /** The plate entry for one plate of the model, at the current size and colours. */
   plateEntry: (setup: Setup) => NewPlateEntry;
 };
@@ -105,6 +105,8 @@ export function PrintSetup(props: Props) {
   const [overrides, setOverrides] = useState<Record<number, number>>({});
   const [job, setJob] = useState<Job | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // Off by default: the file goes to the U1 and waits there, so nobody starts a print by accident.
+  const [autoPrint, setAutoPrint] = useState(false);
   const plateList = usePlate();
   const [plateState, setPlateState] = useState<"idle" | "adding" | "added">("idle");
 
@@ -181,7 +183,7 @@ export function PrintSetup(props: Props) {
   const start = async (send: boolean) => {
     setError(null);
     try {
-      setJob(await props.slice(setup(plate, true), send));
+      setJob(await props.slice(setup(plate, true), { send, print: send && autoPrint }));
     } catch (e) {
       setError((e as Error).message);
     }
@@ -190,7 +192,17 @@ export function PrintSetup(props: Props) {
   const sendExisting = async () => {
     if (!job) return;
     try {
-      setJob(await api<Job>(`/api/jobs/${job.id}/send`, { method: "POST" }));
+      setJob(await api<Job>(`/api/jobs/${job.id}/send`, { method: "POST", body: JSON.stringify({ print: autoPrint }) }));
+    } catch (e) {
+      setError((e as Error).message);
+    }
+  };
+
+  // Start a job the printer already has, without uploading it again.
+  const printExisting = async () => {
+    if (!job) return;
+    try {
+      setJob(await api<Job>(`/api/jobs/${job.id}/print`, { method: "POST", body: JSON.stringify({}) }));
     } catch (e) {
       setError((e as Error).message);
     }
@@ -332,8 +344,9 @@ export function PrintSetup(props: Props) {
         <section className="panel" style={{ order: 7 }}>
           {props.notice}
           <button type="button" className="btn btn-primary btn-lg" disabled={blocked || !settings.printerConfigured} onClick={() => start(true)}>
-            <SendIcon size={20} /> {t("print.sliceAndPrint")}
+            <SendIcon size={20} /> {t("print.sliceAndSend")}
           </button>
+          <AutoPrintToggle value={autoPrint} onChange={setAutoPrint} />
           {props.canSlice && !settings.printerConfigured && (
             <p className="small muted">
               {t("print.printerHint")}
@@ -363,9 +376,25 @@ export function PrintSetup(props: Props) {
           )}
           {tooBig && <div className="notice error">{t("print.tooBig", { n: size })}</div>}
           {error && <div className="notice error">{error}</div>}
-          {job && <JobProgress job={job} onSend={sendExisting} printerConfigured={settings.printerConfigured} tools={settings.tools} />}
+          {job && <JobProgress job={job} onSend={sendExisting} onPrint={printExisting} printerConfigured={settings.printerConfigured} tools={settings.tools} />}
         </section>
       </aside>
+    </div>
+  );
+}
+
+/**
+ * Starts the print right after the upload, or leaves the file waiting on the U1. Unticked by default:
+ * the U1 then only gets the file and nothing moves until somebody presses start on it.
+ */
+export function AutoPrintToggle({ value, onChange }: { value: boolean; onChange: (value: boolean) => void }) {
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+      <label className="small" style={{ display: "flex", alignItems: "center", gap: 8 }}>
+        <input type="checkbox" checked={value} onChange={(e) => onChange(e.target.checked)} />
+        {t("print.autoPrint")}
+      </label>
+      <span className="small muted">{t("print.autoPrintHint")}</span>
     </div>
   );
 }
@@ -434,10 +463,12 @@ function ToolSelect({
   );
 }
 
-export function JobProgress({ job, onSend, printerConfigured, tools }: { job: Job; onSend?: () => void; printerConfigured: boolean; tools: ToolLoad[] }) {
+export function JobProgress({ job, onSend, onPrint, printerConfigured, tools }: { job: Job; onSend?: () => void; onPrint?: () => void; printerConfigured: boolean; tools: ToolLoad[] }) {
   const needsLogin = job.errorCode === "login_required" || job.errorCode === "token_expired";
   const sliced = job.files.gcode.length > 0;
   const sent = job.steps.find((s) => s.key === "upload")?.state === "done";
+  // Sent but not started: the file waits on the printer until somebody presses start there or here.
+  const started = job.steps.find((s) => s.key === "print")?.state === "done";
   // A job on several U1 plates lists its downloads and print buttons per plate elsewhere.
   const perPlate = (job.plates?.length ?? 0) > 1;
   const [showLayers, setShowLayers] = useState(false);
@@ -499,7 +530,12 @@ export function JobProgress({ job, onSend, printerConfigured, tools }: { job: Jo
               <SendIcon size={14} /> {t("print.sendToPrinter")}
             </button>
           )}
-          {sent && (
+          {sent && !started && onPrint && job.status !== "running" && (
+            <button type="button" className="btn btn-sm btn-primary" onClick={onPrint} disabled={!printerConfigured}>
+              {t("print.startPrint")}
+            </button>
+          )}
+          {sent && started && (
             <Link className="btn btn-sm" href="/printer">
               {t("print.watchPrinter")}
             </Link>

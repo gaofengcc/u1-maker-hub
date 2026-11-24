@@ -3,14 +3,15 @@ import path from "node:path";
 import crypto from "node:crypto";
 import { JOB_DIR, readSettings } from "./store.ts";
 import { downloadInstance, MakerWorldError } from "./makerworld.ts";
-import { plateFilaments, readProject } from "./threemf.ts";
+import { addGcodeThumbnails } from "./thumbnails.ts";
+import { plateFilaments, readPlateThumbnail, readProject } from "./threemf.ts";
 import { materialOf, presetForMaterial } from "./profiles.ts";
 import { sliceForU1, type PrintMode, type PrintOptions } from "./slicer.ts";
 import type { PlateTransform } from "./geometry.ts";
 import type { PlateEntry } from "./plate.ts";
 import { combineProjects } from "./combine.ts";
 import { getStatus, runGcode, safeRemoteName, startPrint, uploadGcode } from "./printer.ts";
-import { uploadFilePath, uploadProjectPath, type UploadKind } from "./uploads.ts";
+import { uploadCoverPath, uploadFilePath, uploadProjectPath, type UploadKind } from "./uploads.ts";
 import { isSiteId, type SiteId } from "./sites.ts";
 
 /** A print job: download from MakerWorld (or take an uploaded STL or 3MF), swap in U1 presets, slice, then optionally send to the printer. */
@@ -36,7 +37,10 @@ export type Job = {
   /** Set for a file uploaded by hand; designId and instanceId are then 0. Missing kind means STL. */
   upload?: { id: string; name: string; kind?: UploadKind };
   filamentToTool: number[];
+  /** Upload the G-code to the printer. */
   send: boolean;
+  /** Start the print right after the upload; false sends it only, to be started on the printer. Missing on older jobs (they started it). */
+  print?: boolean;
   status: "running" | "done" | "error";
   steps: { key: StepKey; label: string; state: StepState; detail: string }[];
   error: string | null;
@@ -52,9 +56,9 @@ export type Job = {
 
 /** gramsByFilament: weight of each logical filament of the G-code (T0, T1…); missing on older jobs. */
 export type JobStats = { seconds: number | null; grams: number | null; toolChanges: number | null; gramsByFilament?: number[] };
-export type JobPlate = { gcode: string; project: string; stats: JobStats; remoteName: string | null };
+export type JobPlate = { gcode: string; project: string; stats: JobStats; remoteName: string | null; started?: boolean };
 
-export type NewJob = Pick<Job, "site" | "designId" | "instanceId" | "title" | "cover" | "mode" | "options" | "plate" | "transform" | "items" | "upload" | "filamentToTool" | "send">;
+export type NewJob = Pick<Job, "site" | "designId" | "instanceId" | "title" | "cover" | "mode" | "options" | "plate" | "transform" | "items" | "upload" | "filamentToTool" | "send" | "print">;
 
 export type PlateJobItem = Pick<
   PlateEntry,
@@ -106,6 +110,7 @@ export function createJob(input: NewJob): Job {
   const job: Job = {
     ...input,
     site: isSiteId(input.site) ? input.site : "intl",
+    print: input.print ?? true,
     id: crypto.randomUUID(),
     createdAt: new Date().toISOString(),
     status: "running",
@@ -135,8 +140,11 @@ export function createJob(input: NewJob): Job {
   return job;
 }
 
-/** Sends an already sliced job to the printer: its U1 plate number `plate` (1-based) when it has several. */
-export function sendJob(id: string, plate = 1): Job {
+/**
+ * Sends an already sliced job to the printer: its U1 plate number `plate` (1-based) when it has several.
+ * With `print` false the file is only uploaded, for starting it on the printer's own screen.
+ */
+export function sendJob(id: string, plate = 1, print = true): Job {
   const job = getJob(id);
   if (!job) throw new Error("Job not found.");
   if (!job.files.gcode.length) throw new Error("This job has no G-code yet.");
@@ -144,12 +152,41 @@ export function sendJob(id: string, plate = 1): Job {
   const count = job.plates?.length ?? 1;
   if (!Number.isInteger(plate) || plate < 1 || plate > count) throw new Error(`This job has no plate ${plate}.`);
   job.send = true;
+  job.print = print;
   job.status = "running";
   job.error = null;
   for (const s of job.steps) if (s.key === "upload" || s.key === "print") s.state = "pending";
   registry.set(job.id, job);
   save(job);
   void runSend(job, plate);
+  return job;
+}
+
+/** Starts a job already uploaded to the printer, on its U1 plate number `plate` (1-based). */
+export function printJob(id: string, plate = 1): Job {
+  const job = getJob(id);
+  if (!job) throw new Error("Job not found.");
+  if (job.status === "running") throw new Error("This job is still running.");
+  const count = job.plates?.length ?? 1;
+  if (!Number.isInteger(plate) || plate < 1 || plate > count) throw new Error(`This job has no plate ${plate}.`);
+  const remote = job.plates?.[plate - 1]?.remoteName ?? job.remoteName;
+  if (!remote) throw new Error("This job is not on the printer yet. Send it first.");
+  job.print = true;
+  job.status = "running";
+  job.error = null;
+  const step = job.steps.find((s) => s.key === "print");
+  if (step) step.state = "pending";
+  registry.set(job.id, job);
+  save(job);
+  void (async () => {
+    try {
+      await startTarget(job, plate);
+      job.status = "done";
+      save(job);
+    } catch (err) {
+      fail(job, err);
+    }
+  })();
   return job;
 }
 
@@ -176,6 +213,8 @@ async function runJob(job: Job) {
     let inputs: string[];
     let mapping: number[];
     let filamentTypes: string[] = [];
+    // Where the picture for the U1 file list comes from: the plate picture inside the source 3MF.
+    let pictureSource: { file: string; plate: number } | null = null;
     if (job.upload?.kind === "3mf") {
       // A project file: handled like a MakerWorld download, with its own filaments and plates.
       setStep(job, "download", "running");
@@ -188,6 +227,7 @@ async function runJob(job: Job) {
       mapping = Array.from({ length: slots }, (_, i) => clampTool(job.filamentToTool[i] ?? i % 4));
       setStep(job, "presets", "done", presetDetail(`${project.printer || "3MF"} → Snapmaker U1 · ${slots} filament${slots > 1 ? "s" : ""}`, filamentTypes, mapping, settings.tools));
       inputs = [file];
+      pictureSource = { file, plate: job.plate };
     } else if (job.upload) {
       // A plain mesh: one filament, already in millimetres. The slicer step places it on the bed.
       setStep(job, "download", "running");
@@ -221,6 +261,8 @@ async function runJob(job: Job) {
         path.join(dir, "plates"),
       );
       inputs = placed.files;
+      // The merged plates carry no picture of their own, so the first model's plate picture is used.
+      pictureSource = files.length ? { file: files[0], plate: job.items![0].plate } : null;
       mapping = [0, 1, 2, 3];
       filamentTypes = ["PLA", "PLA", "PLA", "PLA"];
       const where = inputs.length > 1 ? `${inputs.length} plates` : "one plate";
@@ -237,6 +279,7 @@ async function runJob(job: Job) {
       mapping = Array.from({ length: slots }, (_, i) => clampTool(job.filamentToTool[i] ?? i % 4));
       setStep(job, "presets", "done", presetDetail(`${project.printer || "Bambu"} → Snapmaker U1 · ${slots} filament${slots > 1 ? "s" : ""}`, filamentTypes, mapping, settings.tools));
       inputs = [download.file];
+      pictureSource = { file: download.file, plate: job.plate };
     }
     job.filamentToTool = mapping;
 
@@ -248,6 +291,7 @@ async function runJob(job: Job) {
     // One slicer run per U1 plate, one after the other to keep memory use down.
     const plates: JobPlate[] = [];
     const adaptive: NonNullable<Awaited<ReturnType<typeof sliceForU1>>["layers"]>[] = [];
+    const picture = await sourcePicture(job, pictureSource);
     for (const [i, input] of inputs.entries()) {
       if (inputs.length > 1) setStep(job, "slice", "running", `Plate ${i + 1} of ${inputs.length}`);
       const used = await plateFilaments(input, job.items?.length ? 1 : job.plate);
@@ -265,6 +309,8 @@ async function runJob(job: Job) {
         onLog,
       });
       plates.push({ gcode: result.gcodeFiles[0], project: result.exported3mf, stats: readGcodeStats(result.gcodeFiles[0]), remoteName: null });
+      // The slicer leaves the G-code thumbnails out when it runs without a display; write them in.
+      if (addGcodeThumbnails(result.gcodeFiles[0], picture)) onLog("Wrote the file-list picture into the G-code");
       if (result.layers) adaptive.push(result.layers);
       if (inputs.length === 1) job.files = { gcode: result.gcodeFiles, project: result.exported3mf };
     }
@@ -293,35 +339,69 @@ async function runJob(job: Job) {
 
 async function runSend(job: Job, plate: number) {
   try {
-    const target = job.plates?.[plate - 1];
-    const gcode = target?.gcode ?? job.files.gcode[0];
-    const label = target ? ` · plate ${plate} of ${job.plates!.length}` : "";
-    setStep(job, "upload", "running", label.slice(3));
-    // The U1 runs one print at a time; the next plate waits until the bed is cleared.
-    const status = await getStatus().catch(() => null);
-    if (status && (status.state === "printing" || status.state === "paused")) {
-      throw new Error(`The U1 is busy (${status.state}). Send ${target ? `plate ${plate}` : "it"} once the current print is done and the bed is cleared.`);
+    await uploadTarget(job, plate);
+    if (job.print === false) {
+      // Only the file goes to the printer: it waits in the file list until it is started there.
+      setStep(job, "print", "pending", "已发送 · 在打印机上点“开始打印”");
+      job.status = "done";
+      save(job);
+      return;
     }
-    const remoteName = safeRemoteName(target ? `${job.title} plate ${plate}` : job.title);
-    const r = await uploadGcode(gcode, remoteName, false);
-    job.remoteName = r.item?.path ?? remoteName;
-    if (target) target.remoteName = job.remoteName;
-    setStep(job, "upload", "done", job.remoteName);
-
-    setStep(job, "print", "running");
-    // Tell the U1 which physical toolhead prints each logical tool of the file (T0 = model colour 1, ...).
-    // The firmware refuses this while printing and resets it when a print ends.
-    for (const [logical, physical] of job.filamentToTool.entries()) {
-      await runGcode(`SET_PRINT_EXTRUDER_MAP CONFIG_EXTRUDER=${logical} MAP_EXTRUDER=${physical}`);
-    }
-    await startPrint(job.remoteName);
-    const mapText = job.filamentToTool.map((t, i) => `T${i} on T${t + 1}`).join(", ");
-    setStep(job, "print", "done", `Printing${label} · ${mapText}`);
+    await startTarget(job, plate);
     job.status = "done";
     save(job);
   } catch (err) {
     fail(job, err);
   }
+}
+
+/** Uploads the G-code of one plate to the printer; the print itself is started by startTarget. */
+async function uploadTarget(job: Job, plate: number) {
+  const target = job.plates?.[plate - 1];
+  const gcode = target?.gcode ?? job.files.gcode[0];
+  setStep(job, "upload", "running", target ? `plate ${plate} of ${job.plates!.length}` : "");
+  const remoteName = safeRemoteName(target ? `${job.title} plate ${plate}` : job.title);
+  const r = await uploadGcode(gcode, remoteName, false);
+  job.remoteName = r.item?.path ?? remoteName;
+  if (target) target.remoteName = job.remoteName;
+  setStep(job, "upload", "done", job.remoteName);
+}
+
+/** Tells the U1 which toolhead prints each filament, then starts the file already on the printer. */
+async function startTarget(job: Job, plate: number) {
+  const target = job.plates?.[plate - 1];
+  const label = target ? ` · plate ${plate} of ${job.plates!.length}` : "";
+  const remoteName = target?.remoteName ?? job.remoteName;
+  if (!remoteName) throw new Error("This plate is not on the printer yet. Send it first.");
+  // The U1 runs one print at a time; the next plate waits until the bed is cleared.
+  const status = await getStatus().catch(() => null);
+  if (status && (status.state === "printing" || status.state === "paused")) {
+    throw new Error(`The U1 is busy (${status.state}). Start ${target ? `plate ${plate}` : "it"} once the current print is done and the bed is cleared.`);
+  }
+  setStep(job, "print", "running");
+  // Tell the U1 which physical toolhead prints each logical tool of the file (T0 = model colour 1, ...).
+  // The firmware refuses this while printing and resets it when a print ends.
+  for (const [logical, physical] of job.filamentToTool.entries()) {
+    await runGcode(`SET_PRINT_EXTRUDER_MAP CONFIG_EXTRUDER=${logical} MAP_EXTRUDER=${physical}`);
+  }
+  await startPrint(remoteName);
+  job.remoteName = remoteName;
+  if (target) target.started = true;
+  const mapText = job.filamentToTool.map((t, i) => `T${i} on T${t + 1}`).join(", ");
+  setStep(job, "print", "done", `Printing${label} · ${mapText}`);
+}
+
+/** The picture the U1 shows in its file list: the plate render inside the source 3MF, else the upload's own picture. */
+async function sourcePicture(job: Job, source: { file: string; plate: number } | null): Promise<Buffer | null> {
+  if (source) {
+    const png = await readPlateThumbnail(source.file, source.plate).catch(() => null);
+    if (png) return png;
+  }
+  if (job.upload) {
+    const cover = uploadCoverPath(job.upload.id);
+    if (cover && fs.existsSync(cover.file)) return fs.readFileSync(cover.file);
+  }
+  return null;
 }
 
 function clampTool(n: number) {

@@ -232,10 +232,20 @@ export function UploadView({ settings, modes, defaults, initialId }: Props) {
         // A 3MF keeps its creator's supports, like a MakerWorld profile; an STL has none to keep.
         creatorSupports={project?.supports ?? null}
         canSlice
-        slice={(s, send) =>
+        slice={(s, opts) =>
           api<Job>("/api/jobs", {
             method: "POST",
-            body: JSON.stringify({ uploadId: upload.id, title: upload.name, mode: s.mode, options: s.options, plate: s.plate, transform: s.transform, filamentToTool: s.filamentToTool, send }),
+            body: JSON.stringify({
+              uploadId: upload.id,
+              title: upload.name,
+              mode: s.mode,
+              options: s.options,
+              plate: s.plate,
+              transform: s.transform,
+              filamentToTool: s.filamentToTool,
+              send: opts.send,
+              print: opts.print,
+            }),
           })
         }
         plateEntry={(s) => ({
