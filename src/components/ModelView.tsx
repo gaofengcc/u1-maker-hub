@@ -5,6 +5,7 @@ import { useMemo, useState } from "react";
 import type { Instance, ModelDetail } from "@/lib/makerworld.ts";
 import type { Job } from "@/lib/jobs.ts";
 import type { PrintOptions, ToolLoad } from "@/lib/slicer.ts";
+import { sourceForSite, type SiteId } from "@/lib/sites.ts";
 import { api, compact, duration, mwImage, mwSrcSet } from "@/lib/format";
 import { t } from "@/lib/i18n";
 import { FavoriteButton } from "./FavoriteButton";
@@ -15,6 +16,7 @@ import { useCreatorSupports } from "@/lib/useCreatorSupports";
 
 type Props = {
   design: ModelDetail;
+  site: SiteId;
   settings: { loggedIn: boolean; printerConfigured: boolean; tools: ToolLoad[] };
   modes: Mode[];
   defaults: PrintOptions;
@@ -35,11 +37,11 @@ function slotsFor(instance: Instance, plate: number): ColorSlot[] {
   return [...bySlot.values()].sort((a, b) => a.slot - b.slot);
 }
 
-export function ModelView({ design, settings, modes, defaults, filamentPresets }: Props) {
+export function ModelView({ design, site, settings, modes, defaults, filamentPresets }: Props) {
   const [instanceId, setInstanceId] = useState(design.instances[0]?.id ?? design.defaultInstanceId);
   const instance = design.instances.find((i) => i.id === instanceId) ?? design.instances[0];
   const [plate, setPlate] = useState(1);
-  const creatorSupports = useCreatorSupports(instance ? [instance.id] : [], settings.loggedIn);
+  const creatorSupports = useCreatorSupports(instance ? [{ instanceId: instance.id, site }] : [], settings.loggedIn);
   const [picture, setPicture] = useState(0);
 
   const slots = useMemo(() => (instance ? slotsFor(instance, instance.plates.length > 1 ? plate : 0) : []), [instance, plate]);
@@ -65,7 +67,7 @@ export function ModelView({ design, settings, modes, defaults, filamentPresets }
   return (
     <main className="container">
       <nav aria-label={t("model.breadcrumb")} className="small muted" style={{ marginBottom: 16, display: "flex", gap: 8, flexWrap: "wrap" }}>
-        <Link href="/">{t("model.breadcrumb")}</Link>
+        <Link href={`/?source=${sourceForSite(site)}`}>{t("model.breadcrumb")}</Link>
         {design.categories[0] && (
           <>
             <span aria-hidden="true">/</span>
@@ -80,7 +82,7 @@ export function ModelView({ design, settings, modes, defaults, filamentPresets }
         settings={settings}
         modes={modes}
         defaults={defaults}
-        sourceKey={`mw:${instance.id}`}
+        sourceKey={`mw:${site}:${instance.id}`}
         media={
           <>
             {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -155,6 +157,7 @@ export function ModelView({ design, settings, modes, defaults, filamentPresets }
               </a>
             </div>
             <FavoriteButton
+              site={site}
               card={{
                 id: design.id,
                 title: design.title,
@@ -213,7 +216,7 @@ export function ModelView({ design, settings, modes, defaults, filamentPresets }
         slots={slots}
         filamentCount={maxSlot}
         estimate={{ label: t("model.makerWorldTime"), seconds: selectedPlate?.seconds ?? instance.seconds, grams: selectedPlate?.grams ?? instance.grams }}
-        mesh={{ load: () => loadPreviewMesh(instance.id, printedPlate), autoShow: false, available: settings.loggedIn }}
+        mesh={{ load: () => loadPreviewMesh(instance.id, printedPlate, site), autoShow: false, available: settings.loggedIn }}
         creatorSupports={creatorSupports}
         canSlice={settings.loggedIn}
         notice={
@@ -229,7 +232,7 @@ export function ModelView({ design, settings, modes, defaults, filamentPresets }
         extraActions={
           <a
             className="btn"
-            href={settings.loggedIn ? `/api/download/${instance.id}` : undefined}
+            href={settings.loggedIn ? `/api/download/${instance.id}?site=${site}` : undefined}
             aria-disabled={!settings.loggedIn}
             style={settings.loggedIn ? undefined : { opacity: 0.55, pointerEvents: "none" }}
           >
@@ -242,6 +245,7 @@ export function ModelView({ design, settings, modes, defaults, filamentPresets }
             body: JSON.stringify({
               designId: design.id,
               instanceId: instance.id,
+              site,
               title: design.title,
               cover: design.cover,
               mode: s.mode,
@@ -257,6 +261,7 @@ export function ModelView({ design, settings, modes, defaults, filamentPresets }
         plateEntry={(s) => ({
           designId: design.id,
           instanceId: instance.id,
+          site,
           title: design.title,
           profile: instance.title,
           cover: instance.cover || design.cover,

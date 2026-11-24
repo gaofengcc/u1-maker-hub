@@ -1,6 +1,8 @@
 import { Suspense } from "react";
 import { Explore } from "@/components/Explore";
 import { defaultListing, PERIODS, SORTS, type PeriodKey, type SortKey } from "@/lib/makerworld.ts";
+import { isSourceId, sourceForSite } from "@/lib/sites.ts";
+import { readSettings } from "@/lib/store.ts";
 
 export default function Home(props: PageProps<"/">) {
   return (
@@ -13,11 +15,12 @@ export default function Home(props: PageProps<"/">) {
 async function HomeContent({ searchParams }: { searchParams: PageProps<"/">["searchParams"] }) {
   const sp = await searchParams;
   const q = typeof sp.q === "string" ? sp.q : "";
+  const source = isSourceId(sp.source) ? sp.source : sourceForSite(readSettings().site);
   const mode = q.trim() ? "search" : "browse";
   const defaults = defaultListing(q);
   const sorts = (Object.keys(SORTS) as SortKey[]).filter((k) => SORTS[k][mode]).map((key) => ({ key, label: SORTS[key].label }));
   const periods = (Object.keys(PERIODS) as PeriodKey[]).map((key) => ({ key, label: PERIODS[key].label }));
   const sort = typeof sp.sort === "string" && sorts.some((s) => s.key === sp.sort) ? sp.sort : defaults.sort;
   const period = typeof sp.period === "string" && sp.period in PERIODS ? sp.period : defaults.period;
-  return <Explore key={`${q}|${sort}|${period}`} query={q} sort={sort} period={period} sorts={sorts} periods={periods} defaults={defaults} />;
+  return <Explore key={`${source}|${q}|${sort}|${period}`} source={source} query={q} sort={sort} period={period} sorts={sorts} periods={periods} defaults={defaults} />;
 }

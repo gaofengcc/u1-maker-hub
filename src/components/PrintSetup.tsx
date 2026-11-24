@@ -464,7 +464,7 @@ function ToolSelect({
 }
 
 export function JobProgress({ job, onSend, onPrint, printerConfigured, tools }: { job: Job; onSend?: () => void; onPrint?: () => void; printerConfigured: boolean; tools: ToolLoad[] }) {
-  const needsLogin = job.errorCode === "login_required" || job.errorCode === "token_expired";
+  const needsLogin = job.source !== "sm-intl" && (job.errorCode === "login_required" || job.errorCode === "token_expired");
   const sliced = job.files.gcode.length > 0;
   const sent = job.steps.find((s) => s.key === "upload")?.state === "done";
   // Sent but not started: the file waits on the printer until somebody presses start there or here.

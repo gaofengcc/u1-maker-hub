@@ -1,11 +1,12 @@
 import { NextResponse } from "next/server";
 import { MakerWorldError } from "./makerworld.ts";
+import { SnapmakerError } from "./snapmaker.ts";
 import { PrinterError } from "./printer.ts";
 import { PowerError } from "./homeassistant.ts";
 
 /** Turns any thrown error into a JSON response the UI can show. */
 export function errorResponse(err: unknown) {
-  if (err instanceof MakerWorldError) {
+  if (err instanceof MakerWorldError || err instanceof SnapmakerError) {
     return NextResponse.json({ error: err.message, code: err.code }, { status: err.status >= 400 ? err.status : 502 });
   }
   if (err instanceof PrinterError) {

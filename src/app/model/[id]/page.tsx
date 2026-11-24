@@ -3,16 +3,20 @@ import { notFound } from "next/navigation";
 import { connection } from "next/server";
 import sanitizeHtml from "sanitize-html";
 import { getDesign, MakerWorldError } from "@/lib/makerworld.ts";
+import { getModel, SnapmakerError } from "@/lib/snapmaker.ts";
+import { isSourceId, siteForSource } from "@/lib/sites.ts";
 import { publicSettings } from "@/lib/store.ts";
 import { u1Filaments } from "@/lib/profiles.ts";
 import { DEFAULT_OPTIONS, PRINT_MODES } from "@/lib/slicer.ts";
 import { ModelView } from "@/components/ModelView";
+import { SnapmakerModelView } from "@/components/SnapmakerModelView";
 import { mwImage } from "@/lib/format";
+import { t } from "@/lib/i18n";
 
 export default function ModelPage(props: PageProps<"/model/[id]">) {
   return (
-    <Suspense fallback={<main className="container muted">Loading model from MakerWorld…</main>}>
-      <ModelContent params={props.params} />
+    <Suspense fallback={<main className="container muted">{t("model.loading")}</main>}>
+      <ModelContent params={props.params} searchParams={props.searchParams} />
     </Suspense>
   );
 }
@@ -24,7 +28,7 @@ const clean = (html: string) =>
     allowedSchemes: ["https"],
     transformTags: {
       a: sanitizeHtml.simpleTransform("a", { target: "_blank", rel: "noopener noreferrer nofollow" }),
-      // Description images are full-size originals too: ask the CDN for a 1200 px WebP.
+      // MakerWorld 的描述图片使用 CDN 缩放，其他来源保留原始图片地址。
       img: (_tag, attribs) => ({
         tagName: "img",
         attribs: { ...attribs, src: mwImage(attribs.src, 1200), loading: "lazy", referrerpolicy: "no-referrer" },
@@ -34,15 +38,41 @@ const clean = (html: string) =>
     },
   });
 
-async function ModelContent({ params }: { params: PageProps<"/model/[id]">["params"] }) {
+async function ModelContent({ params, searchParams }: PageProps<"/model/[id]">) {
   await connection();
-  const { id } = await params;
+  const [{ id }, { source }] = await Promise.all([params, searchParams]);
+  const settings = publicSettings();
+  const site = isSourceId(source) ? siteForSource(source) : settings.site;
+  if (!site) {
+    let design;
+    try {
+      design = await getModel(id);
+    } catch (err) {
+      if (err instanceof SnapmakerError && (err.code === "not_found" || err.status === 400)) notFound();
+      return (
+        <main className="container">
+          <div className="notice error">{t("snapmaker.loadError", { error: (err as Error).message })}</div>
+        </main>
+      );
+    }
+    return (
+      <>
+        <title>{`${design.title} · U1 Maker Hub`}</title>
+        <SnapmakerModelView
+          key={design.id}
+          design={{ ...design, description: clean(design.description || design.translatedDescription) }}
+          settings={{ printerConfigured: Boolean(settings.printerHost), tools: settings.tools }}
+        />
+      </>
+    );
+  }
+
   const designId = Number(id);
   if (!Number.isInteger(designId) || designId <= 0) notFound();
 
   let design;
   try {
-    design = await getDesign(designId);
+    design = await getDesign(designId, site);
   } catch (err) {
     if (err instanceof MakerWorldError && err.code === "not_found") notFound();
     return (
@@ -52,17 +82,18 @@ async function ModelContent({ params }: { params: PageProps<"/model/[id]">["para
     );
   }
 
-  const settings = publicSettings();
   return (
     <>
       <title>{`${design.title} · U1 Maker Hub`}</title>
       <ModelView
+        key={`${site}:${design.id}`}
+        site={site}
         design={{
           ...design,
           summary: clean(design.summary),
           instances: design.instances.map((i) => ({ ...i, summary: clean(i.summary) })),
         }}
-        settings={{ loggedIn: settings.loggedIn, printerConfigured: Boolean(settings.printerHost), tools: settings.tools }}
+        settings={{ loggedIn: settings.accounts[site].loggedIn, printerConfigured: Boolean(settings.printerHost), tools: settings.tools }}
         modes={Object.entries(PRINT_MODES).map(([key, m]) => ({ key, label: m.label, description: m.description }))}
         defaults={DEFAULT_OPTIONS}
         filamentPresets={u1Filaments()}

@@ -3,6 +3,7 @@
 import { useEffect, useSyncExternalStore } from "react";
 import type { ModelCard } from "./makerworld.ts";
 import type { Favorite, FavoriteSource, SyncState } from "./favorites.ts";
+import type { SiteId } from "./sites.ts";
 
 /**
  * One shared copy of the saved models for every component on the page (hearts, header count,
@@ -28,6 +29,7 @@ function set(patch: Partial<Store>) {
 }
 
 const sourcesOf = (f: Favorite): FavoriteSource[] => (f.sources?.length ? f.sources : ["app"]);
+const matches = (f: Favorite, id: number, site?: SiteId) => f.id === id && (!site || f.site === site);
 
 /** Brings in MakerWorld likes; `force` skips the server's 2-minute pause between syncs. */
 async function syncNow(force = false) {
@@ -60,13 +62,13 @@ function load() {
     });
 }
 
-async function save(card: ModelCard) {
+async function save(card: ModelCard, site?: SiteId) {
   const before = store.favorites ?? [];
-  const existing = before.find((f) => f.id === card.id);
+  const existing = before.find((f) => matches(f, card.id, site));
   const sources = [...new Set<FavoriteSource>(["app", ...(existing ? sourcesOf(existing) : [])])];
-  set({ favorites: [{ ...card, savedAt: new Date().toISOString(), sources }, ...before.filter((f) => f.id !== card.id)] });
+  set({ favorites: [{ ...card, site, savedAt: new Date().toISOString(), sources }, ...before.filter((f) => !matches(f, card.id, site))] });
   try {
-    const res = await fetch("/api/favorites", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(card) });
+    const res = await fetch("/api/favorites", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...card, site }) });
     if (!res.ok) throw new Error();
     set({ favorites: await res.json() });
   } catch {
@@ -75,17 +77,17 @@ async function save(card: ModelCard) {
 }
 
 /** Removes the app's save; a model liked or collected on MakerWorld stays until it is unliked there. */
-async function remove(id: number) {
+async function remove(id: number, site?: SiteId) {
   const before = store.favorites ?? [];
   set({
     favorites: before.flatMap((f) => {
-      if (f.id !== id) return [f];
+      if (!matches(f, id, site)) return [f];
       const rest = sourcesOf(f).filter((s) => s !== "app");
       return rest.length ? [{ ...f, sources: rest }] : [];
     }),
   });
   try {
-    const res = await fetch(`/api/favorites/${id}`, { method: "DELETE" });
+    const res = await fetch(`/api/favorites/${id}${site ? `?site=${site}` : ""}`, { method: "DELETE" });
     if (!res.ok) throw new Error();
     set({ favorites: await res.json() });
   } catch {
@@ -104,21 +106,24 @@ export function useFavorites() {
   );
   useEffect(load, []);
   const list = s.favorites ?? EMPTY;
-  const find = (id: number) => list.find((f) => f.id === id);
+  const find = (id: number, site?: SiteId) => list.find((f) => matches(f, id, site));
   return {
     favorites: list,
     ready: s.favorites !== null,
     sync: s.sync,
     syncing: s.syncing,
     syncNow: () => syncNow(true),
-    isSaved: (id: number) => Boolean(find(id)),
+    isSaved: (id: number, site?: SiteId) => Boolean(find(id, site)),
     /** Where a saved model comes from; empty when it is not saved. */
-    sourcesOf: (id: number) => {
-      const f = find(id);
+    sourcesOf: (id: number, site?: SiteId) => {
+      const f = find(id, site);
       return f ? sourcesOf(f) : [];
     },
     /** Saves in the app, or removes the app's save. */
-    toggle: (card: ModelCard) => (find(card.id) && sourcesOf(find(card.id)!).includes("app") ? remove(card.id) : save(card)),
+    toggle: (card: ModelCard, site?: SiteId) => {
+      const favorite = find(card.id, site);
+      return favorite && sourcesOf(favorite).includes("app") ? remove(card.id, site) : save(card, site);
+    },
     remove,
   };
 }

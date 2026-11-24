@@ -34,7 +34,7 @@ echo "==> OrcaSlicer runtime libraries (needed even for the headless CLI)"
 apt-get install -y -qq --no-install-recommends \
   libgtk-3-0t64 libwebkit2gtk-4.1-0 libgl1 libglu1-mesa libegl1 libopengl0 \
   libgstreamer1.0-0 libgstreamer-plugins-base1.0-0 libmspack0t64 libsecret-1-0 \
-  libsoup-3.0-0 libsm6 libice6 libwayland-egl1 >/dev/null
+  libsoup-3.0-0 libsm6 libice6 libwayland-egl1 xvfb xauth >/dev/null
 
 echo "==> OrcaSlicer ${ORCA_VERSION}"
 if ! /opt/orcaslicer/AppRun --help 2>/dev/null | grep -q "OrcaSlicer-${ORCA_VERSION}"; then

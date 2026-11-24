@@ -1,4 +1,5 @@
 import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
 
 /**
@@ -9,7 +10,11 @@ import path from "node:path";
 
 // macOS: the OrcaSlicer.app bundle. Linux: an extracted AppImage (`--appimage-extract` gives squashfs-root/).
 const IS_MAC = process.platform === "darwin";
-export const SLICER_APP = process.env.SLICER_APP ?? (IS_MAC ? "/Applications/OrcaSlicer.app" : "/opt/orcaslicer");
+const LOCAL_SLICER_APP = path.join(os.homedir(), "Applications", "orca24", "squashfs-root");
+const LINUX_SLICER_APP = fs.existsSync("/opt/orcaslicer/AppRun") || !fs.existsSync(path.join(LOCAL_SLICER_APP, "AppRun"))
+  ? "/opt/orcaslicer"
+  : LOCAL_SLICER_APP;
+export const SLICER_APP = process.env.SLICER_APP ?? (IS_MAC ? "/Applications/OrcaSlicer.app" : LINUX_SLICER_APP);
 export const SLICER_BIN =
   process.env.SLICER_BIN ?? (IS_MAC ? path.join(SLICER_APP, "Contents/MacOS/OrcaSlicer") : path.join(SLICER_APP, "AppRun"));
 const PROFILE_ROOT =

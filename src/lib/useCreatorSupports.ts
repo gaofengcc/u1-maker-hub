@@ -2,20 +2,22 @@
 
 import { useEffect, useState } from "react";
 import type { PrintOptions } from "./slicer.ts";
+import type { SiteId } from "./sites.ts";
 
 type Supports = PrintOptions["supports"];
+type Profile = { instanceId: number; site?: SiteId };
 
-const cache = new Map<number, Promise<Supports>>();
+const cache = new Map<string, Promise<Supports>>();
 
-function load(instanceId: number): Promise<Supports> {
-  let pending = cache.get(instanceId);
+function load(url: string): Promise<Supports> {
+  let pending = cache.get(url);
   if (!pending) {
-    pending = fetch(`/api/profile/${instanceId}`).then(async (res) => {
-      if (!res.ok) throw new Error(`Profile ${instanceId}: ${res.status}`);
+    pending = fetch(url).then(async (res) => {
+      if (!res.ok) throw new Error(`Profile request failed: ${res.status}`);
       return ((await res.json()) as { supports: Supports }).supports;
     });
-    pending.catch(() => cache.delete(instanceId));
-    cache.set(instanceId, pending);
+    pending.catch(() => cache.delete(url));
+    cache.set(url, pending);
   }
   return pending;
 }
@@ -25,14 +27,15 @@ function load(instanceId: number): Promise<Supports> {
  * them used supports anywhere, "plate" when they all kept supports on the plate, "off" when none did,
  * and null until known (or without a Bambu login, which the download needs).
  */
-export function useCreatorSupports(instanceIds: number[], enabled: boolean): Supports | null {
-  const key = [...new Set(instanceIds)].sort((a, b) => a - b).join(",");
+export function useCreatorSupports(profiles: Profile[], enabled: boolean): Supports | null {
+  const urls = profiles.map(({ instanceId, site }) => `/api/profile/${instanceId}${site ? `?site=${site}` : ""}`);
+  const key = [...new Set(urls)].sort().join(",");
   const [result, setResult] = useState<{ key: string; supports: Supports } | null>(null);
 
   useEffect(() => {
     if (!enabled || !key) return;
     let alive = true;
-    Promise.all(key.split(",").map((id) => load(Number(id))))
+    Promise.all(key.split(",").map(load))
       .then((list) => {
         const supports: Supports = list.includes("auto") ? "auto" : list.includes("plate") ? "plate" : "off";
         if (alive) setResult({ key, supports });

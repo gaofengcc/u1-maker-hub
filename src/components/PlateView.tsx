@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 import type { Job } from "@/lib/jobs.ts";
 import type { PlateChange, PlateEntry } from "@/lib/plate.ts";
 import type { PrintOptions, ToolLoad } from "@/lib/slicer.ts";
+import { sourceForSite, type SiteId } from "@/lib/sites.ts";
 import { api, duration, euros, inkFor, mwImage, slicedPrice } from "@/lib/format";
 import { t } from "@/lib/i18n";
 import { footprint, MAX_BEDS, packBeds } from "@/lib/packing";
@@ -18,10 +19,12 @@ import { useCreatorSupports, useSupportsOption } from "@/lib/useCreatorSupports"
 import { DownloadIcon, SendIcon } from "./Icons";
 
 type Props = {
-  settings: { loggedIn: boolean; printerConfigured: boolean; tools: ToolLoad[] };
+  settings: { site: SiteId; logins: Record<SiteId, boolean>; printerConfigured: boolean; tools: ToolLoad[] };
   modes: Mode[];
   defaults: PrintOptions;
 };
+
+const meshKey = (e: PlateEntry) => (e.uploadId ? `upload:${e.uploadId}:${e.plate}` : `mw:${e.site}:${e.instanceId}:${e.plate}`);
 
 /** Several models printed together: the list, the packed layout on the U1 bed, and the print buttons. */
 export function PlateView({ settings, modes, defaults }: Props) {
@@ -30,11 +33,12 @@ export function PlateView({ settings, modes, defaults }: Props) {
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [mode, setMode] = useState(modes[0]?.key ?? "fast");
   const [baseOptions, setOptions] = useState<PrintOptions>(defaults);
+  const needsLogin = entries.some((e) => !e.uploadId && !settings.logins[e.site ?? settings.site]);
   // Supports are on when any model's creator used them, until the person picks a value.
   const creatorSupports = useCreatorSupports(
     // Uploads have no MakerWorld profile to read the creator's supports from.
-    entries.filter((e) => !e.uploadId).map((e) => e.instanceId),
-    settings.loggedIn,
+    entries.filter((e) => !e.uploadId).map((e) => ({ instanceId: e.instanceId, site: e.site ?? settings.site })),
+    !needsLogin,
   );
   const supportsOption = useSupportsOption(baseOptions, setOptions, creatorSupports, defaults);
   const options = supportsOption.value;
@@ -47,23 +51,22 @@ export function PlateView({ settings, modes, defaults }: Props) {
   /** The model whose next clicked face is laid on the bed. */
   const [pickingId, setPickingId] = useState<string | null>(null);
 
-  const meshKey = (e: PlateEntry) => (e.uploadId ? `upload:${e.uploadId}:${e.plate}` : `${e.instanceId}:${e.plate}`);
-
   // The geometry of every model, for the preview and to know how much room each one takes.
   // MakerWorld models need the Bambu login to download; uploads are already here.
   useEffect(() => {
     let alive = true;
     for (const e of entries) {
-      if (!e.uploadId && !settings.loggedIn) continue;
+      const site = e.site ?? settings.site;
+      if (!e.uploadId && !settings.logins[site]) continue;
       const key = meshKey(e);
-      (e.uploadId ? loadUploadMesh(e.uploadId, e.plate) : loadPreviewMesh(e.instanceId, e.plate))
+      (e.uploadId ? loadUploadMesh(e.uploadId, e.plate) : loadPreviewMesh(e.instanceId, e.plate, site))
         .then((m) => alive && setMeshes((prev) => (prev[key] ? prev : { ...prev, [key]: m })))
         .catch((err) => alive && setErrors((prev) => ({ ...prev, [key]: (err as Error).message })));
     }
     return () => {
       alive = false;
     };
-  }, [entries, settings.loggedIn]);
+  }, [entries, settings.logins, settings.site]);
 
   useEffect(() => {
     if (!job || job.status !== "running") return;
@@ -211,7 +214,7 @@ export function PlateView({ settings, modes, defaults }: Props) {
                 ))}
               </div>
             )}
-            {!settings.loggedIn && entries.some((e) => !e.uploadId) ? (
+            {needsLogin ? (
               <div className="notice">
                 {t("plate.loginToPlaceBefore")} <Link href="/settings">{t("plate.loginBambu")}</Link>{t("plate.loginToPlaceAfter")}
               </div>
@@ -391,7 +394,7 @@ function PlateRow({
         {entry.cover ? <img src={mwImage(entry.cover, 120)} width={56} height={56} alt="" className="plate-thumb" referrerPolicy="no-referrer" /> : <span className="plate-thumb" />}
         <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 2 }}>
           <Link
-            href={entry.uploadId ? `/upload?id=${entry.uploadId}` : `/model/${entry.designId}`}
+            href={entry.uploadId ? `/upload?id=${entry.uploadId}` : `/model/${entry.designId}${entry.site ? `?source=${sourceForSite(entry.site)}` : ""}`}
             style={{ fontWeight: 600, fontSize: 14, color: "var(--text)" }}
             className="ellipsis"
           >

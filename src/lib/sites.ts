@@ -1,4 +1,19 @@
 export type SiteId = "intl" | "cn";
+export const SOURCE_IDS = ["mw-cn", "mw-intl", "sm-intl"] as const;
+export type SourceId = (typeof SOURCE_IDS)[number];
+export const SOURCE_LABELS: Record<SourceId, string> = {
+  "mw-cn": "MakerWorld 中国站",
+  "mw-intl": "MakerWorld 国际站",
+  "sm-intl": "Snapmaker Space 国际站",
+};
+
+export function isSourceId(v: unknown): v is SourceId { return SOURCE_IDS.some((id) => id === v); }
+export function sourceForSite(site: SiteId = resolveSite()): Exclude<SourceId, "sm-intl"> { return site === "cn" ? "mw-cn" : "mw-intl"; }
+export function siteForSource(source: SourceId): SiteId | null {
+  if (source === "sm-intl") return null;
+  return source === "mw-cn" ? "cn" : "intl";
+}
+
 export type SiteConfig = {
   id: SiteId;
   label: string;

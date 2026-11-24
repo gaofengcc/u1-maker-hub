@@ -40,7 +40,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
         </Suspense>
         {children}
         <footer className="footer">
-          模型来自 MakerWorld，版权归原作者所有，仅供个人使用。
+          MakerWorld 和 Snapmaker Space 模型的版权归原作者所有，仅供个人使用。
         </footer>
         <ServiceWorker />
       </body>

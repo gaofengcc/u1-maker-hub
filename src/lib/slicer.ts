@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { spawn } from "node:child_process";
+import JSZip from "jszip";
 import { flattenPreset, materialOf, presetForMaterial, SLICER_BIN, U1_MACHINE, type Preset } from "./profiles.ts";
 import { replaceProjectSettings } from "./threemf.ts";
 import { isIdentity, NO_TRANSFORM, type PlateTransform } from "./geometry.ts";
@@ -152,6 +153,36 @@ export type SliceResult = {
   /** Set with adaptive layers: the thinnest and thickest layer in mm, and whether the slicer used them. */
   layers?: { min: number; max: number; applied: boolean };
 };
+
+/** 使用 Snapmaker Space 配置自带的 U1 预设切片，并保留供打印机上传的完整切片包。 */
+export async function sliceSnapmakerProfile(req: Pick<SliceRequest, "input" | "workDir" | "onLog">): Promise<SliceResult> {
+  const outDir = path.join(req.workDir, "out");
+  fs.mkdirSync(outDir, { recursive: true });
+  const exportName = "u1.gcode.3mf";
+  const [bin, ...prefix] = process.platform === "linux" ? ["xvfb-run", "-a", SLICER_BIN] : [SLICER_BIN];
+  const log = await run(bin, [
+    ...prefix,
+    "--allow-newer-file",
+    "--slice", "0",
+    "--outputdir", outDir,
+    "--export-3mf", exportName,
+    req.input,
+  ], req.workDir, req.onLog);
+  const exported3mf = path.join(outDir, exportName);
+  if (!fs.existsSync(exported3mf)) throw new SlicerError("OrcaSlicer 未生成 .gcode.3mf 切片包。");
+
+  // 从切片包提取各盘 G-code，沿用现有的切片统计和本地下载接口。
+  const zip = await JSZip.loadAsync(fs.readFileSync(exported3mf));
+  const plates = zip.file(/^Metadata\/plate_\d+\.gcode$/).sort((a, b) => a.name.localeCompare(b.name, "en", { numeric: true }));
+  if (!plates.length) throw new SlicerError("切片包里没有盘面的 G-code。");
+  const gcodeFiles: string[] = [];
+  for (const plate of plates) {
+    const file = path.join(outDir, path.basename(plate.name));
+    fs.writeFileSync(file, await plate.async("nodebuffer"));
+    gcodeFiles.push(file);
+  }
+  return { gcodeFiles, exported3mf, log };
+}
 
 export async function sliceForU1(req: SliceRequest): Promise<SliceResult> {
   fs.mkdirSync(req.workDir, { recursive: true });

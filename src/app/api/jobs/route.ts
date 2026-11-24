@@ -5,7 +5,7 @@ import type { PlateTransform } from "@/lib/geometry.ts";
 import { errorResponse, readJson } from "@/lib/http.ts";
 import { getUpload, uploadKind } from "@/lib/uploads.ts";
 import { cleanOrient } from "@/lib/orient.ts";
-import { resolveSite } from "@/lib/sites.ts";
+import { isSourceId, resolveSite, siteForSource } from "@/lib/sites.ts";
 
 export async function GET() {
   return NextResponse.json(listJobs().map((job) => ({ ...job, log: [] })));
@@ -27,6 +27,8 @@ type Body = {
   /** Start the print right after the upload (default true). */
   print?: boolean;
   site?: string;
+  source?: string;
+  snapmaker?: { modelId?: string; profileId?: string };
 };
 
 /** 10% to 500%, a rotation in 0..359 degrees, and an orientation when it is a real rotation. */
@@ -42,9 +44,20 @@ function cleanTransform(t: Body["transform"]): PlateTransform {
 
 export async function POST(req: Request) {
   const b = await readJson<Body>(req);
+  const source = isSourceId(b.source) ? b.source : undefined;
+  if (b.source !== undefined && !source) return NextResponse.json({ error: "未知的模型来源。" }, { status: 400 });
+  let snapmaker: { modelId: string; profileId?: string } | undefined;
+  if (source === "sm-intl") {
+    const { modelId, profileId } = b.snapmaker ?? {};
+    const validId = (id: unknown): id is string => typeof id === "string" && /^[a-z0-9_-]+$/i.test(id);
+    if (b.uploadId || !validId(modelId) || (profileId !== undefined && !validId(profileId))) {
+      return NextResponse.json({ error: "请选择有效的 Snapmaker 模型和打印配置。" }, { status: 400 });
+    }
+    snapmaker = { modelId, profileId };
+  }
   const upload = b.uploadId ? getUpload(String(b.uploadId)) : null;
   if (b.uploadId && !upload) return NextResponse.json({ error: "This upload no longer exists. Upload the file again." }, { status: 404 });
-  if (!upload && (!Number.isInteger(b.designId) || !Number.isInteger(b.instanceId))) {
+  if (!snapmaker && !upload && (!Number.isInteger(b.designId) || !Number.isInteger(b.instanceId))) {
     return NextResponse.json({ error: "Pick a model and a print profile." }, { status: 400 });
   }
   const mode = (b.mode && b.mode in PRINT_MODES ? b.mode : "fast") as PrintMode;
@@ -57,10 +70,10 @@ export async function POST(req: Request) {
   }
   try {
     const job = createJob({
-      designId: upload ? 0 : b.designId!,
-      instanceId: upload ? 0 : b.instanceId!,
+      designId: snapmaker || upload ? 0 : b.designId!,
+      instanceId: snapmaker || upload ? 0 : b.instanceId!,
       upload: upload ? { id: upload.id, name: upload.name, kind: kind! } : undefined,
-      title: String(b.title ?? upload?.name ?? "MakerWorld model").slice(0, 200),
+      title: String(b.title ?? upload?.name ?? (snapmaker ? "Snapmaker 模型" : "MakerWorld model")).slice(0, 200),
       cover: String(b.cover ?? ""),
       mode,
       options: { ...DEFAULT_OPTIONS, ...(b.options ?? {}) },
@@ -68,8 +81,10 @@ export async function POST(req: Request) {
       transform: cleanTransform(b.transform),
       filamentToTool: Array.isArray(b.filamentToTool) ? b.filamentToTool.map(Number) : [],
       send: Boolean(b.send),
-      print: b.print !== false,
-      site: resolveSite(b.site),
+      print: !snapmaker && b.print !== false,
+      site: (source && siteForSource(source)) || resolveSite(b.site),
+      source,
+      snapmaker,
     });
     return NextResponse.json(job, { status: 201 });
   } catch (err) {

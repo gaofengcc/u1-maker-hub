@@ -57,7 +57,7 @@ export function SavedView() {
   const shown = useMemo(() => {
     const q = filter.trim().toLowerCase();
     const list = favorites.filter((f) => {
-      const sources = sourcesOf(f.id);
+      const sources = sourcesOf(f.id, f.site);
       if (origin === "app" && !sources.includes("app")) return false;
       if (origin === "mw" && !sources.some((s) => s !== "app")) return false;
       return !q || f.title.toLowerCase().includes(q) || f.creator.name.toLowerCase().includes(q);
@@ -150,16 +150,16 @@ export function SavedView() {
       ) : (
         <section className="grid" aria-label={t("saved.modelsAria")}>
           {shown.map((f, i) => (
-            <div key={f.id} style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-              <ModelCard model={f} priority={i < 8} />
+            <div key={`${f.site}:${f.id}`} style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+              <ModelCard model={f} site={f.site} priority={i < 8} />
               <span className="source-badges" style={{ paddingLeft: 4 }}>
-                {sourcesOf(f.id).map((s) => (
+                {sourcesOf(f.id, f.site).map((s) => (
                   <span key={s} className={`badge ${SOURCE_BADGES[s][0]}`}>
                     {t(SOURCE_BADGES[s][1])}
                   </span>
                 ))}
                 <span className="small muted">
-                  {sourcesOf(f.id).includes("app") ? t("saved.sourceSaved") : t("saved.sourceFound")} {savedAgo(f.savedAt)}
+                  {sourcesOf(f.id, f.site).includes("app") ? t("saved.sourceSaved") : t("saved.sourceFound")} {savedAgo(f.savedAt)}
                 </span>
               </span>
             </div>

@@ -41,7 +41,7 @@ export function Header() {
     };
   }, []);
 
-  // The current Bambu site (中国站 / 国际站), so it is visible on every page.
+  // 显示设置中选定的默认 MakerWorld 站点。
   useEffect(() => {
     let alive = true;
     fetch("/api/settings")
@@ -104,7 +104,7 @@ export function Header() {
             ))}
           </nav>
           {site && (
-            <Link href="/settings" className="chip" title="点击切换模型站" aria-label={`当前模型站：${SITES[site].label}`}>
+            <Link href="/settings" className="chip" title="设置默认 MakerWorld 站点" aria-label={`默认 MakerWorld 站点：${SITES[site].label}`}>
               {SITES[site].label}
             </Link>
           )}

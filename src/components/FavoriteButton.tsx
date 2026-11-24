@@ -2,6 +2,7 @@
 
 import type { ModelCard } from "@/lib/makerworld.ts";
 import type { FavoriteSource } from "@/lib/favorites.ts";
+import type { SiteId } from "@/lib/sites.ts";
 import { useFavorites } from "@/lib/useFavorites";
 import { t } from "@/lib/i18n";
 
@@ -31,27 +32,27 @@ function describe(title: string, sources: FavoriteSource[]) {
 }
 
 /** Round heart shown over a model card. */
-export function FavoriteIcon({ card }: { card: ModelCard }) {
+export function FavoriteIcon({ card, site }: { card: ModelCard; site?: SiteId }) {
   const { sourcesOf, toggle } = useFavorites();
-  const sources = sourcesOf(card.id);
+  const sources = sourcesOf(card.id, site);
   const saved = sources.length > 0;
   const label = describe(card.title, sources);
   return (
-    <button type="button" className={`fav-icon ${saved ? "on" : ""}`} aria-pressed={saved} aria-label={label} title={label} onClick={() => toggle(card)}>
+    <button type="button" className={`fav-icon ${saved ? "on" : ""}`} aria-pressed={saved} aria-label={label} title={label} onClick={() => toggle(card, site)}>
       <Heart filled={saved} size={18} />
     </button>
   );
 }
 
 /** Full-width button for the model page. */
-export function FavoriteButton({ card }: { card: ModelCard }) {
+export function FavoriteButton({ card, site }: { card: ModelCard; site?: SiteId }) {
   const { sourcesOf, toggle } = useFavorites();
-  const sources = sourcesOf(card.id);
+  const sources = sourcesOf(card.id, site);
   const inApp = sources.includes("app");
   const mw = makerWorldLabel(sources);
   return (
     <>
-      <button type="button" className={`btn fav-btn ${sources.length ? "on" : ""}`} aria-pressed={inApp} onClick={() => toggle(card)} title={describe(card.title, sources)}>
+      <button type="button" className={`btn fav-btn ${sources.length ? "on" : ""}`} aria-pressed={inApp} onClick={() => toggle(card, site)} title={describe(card.title, sources)}>
         <Heart filled={sources.length > 0} size={16} />
         {inApp ? t("fav.savedForLater") : t("fav.saveForLaterShort")}
       </button>

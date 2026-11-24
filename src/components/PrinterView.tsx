@@ -6,6 +6,7 @@ import type { PrinterStatus, ToolState } from "@/lib/printer.ts";
 import type { Job } from "@/lib/jobs.ts";
 import { api, duration, inkFor } from "@/lib/format";
 import { t } from "@/lib/i18n";
+import { sourceForSite } from "@/lib/sites";
 import { PauseIcon, PlayIcon, PowerIcon, StopIcon } from "./Icons";
 import { CameraView } from "./CameraView";
 
@@ -15,6 +16,12 @@ type StatusResponse =
 type HistoryItem = { filename: string; status: string; print_duration: number; end_time: number };
 /** The printer's smart plug in Home Assistant (see /api/printer/power). */
 type PowerResponse = { configured: false } | { configured: true; state: string; name?: string; error?: string };
+
+function jobModelUrl(job: Job) {
+  if (job.upload) return `/upload?id=${job.upload.id}`;
+  const id = job.snapmaker?.modelId ?? job.designId;
+  return `/model/${encodeURIComponent(id)}?source=${job.source ?? sourceForSite(job.site)}`;
+}
 
 export function PrinterView() {
   const [status, setStatus] = useState<StatusResponse | null>(null);
@@ -195,7 +202,7 @@ export function PrinterView() {
                     {jobs.map((j) => (
                       <tr key={j.id}>
                         <td>
-                          <Link href={j.upload ? `/upload?id=${j.upload.id}` : `/model/${j.designId}`}>{j.title}</Link>
+                          <Link href={jobModelUrl(j)}>{j.title}</Link>
                         </td>
                         <td className="muted">{duration(j.stats.seconds)}</td>
                         <td>

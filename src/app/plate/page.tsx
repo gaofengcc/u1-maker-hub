@@ -19,7 +19,12 @@ async function PlateContent() {
   const settings = publicSettings();
   return (
     <PlateView
-      settings={{ loggedIn: settings.loggedIn, printerConfigured: Boolean(settings.printerHost), tools: settings.tools }}
+      settings={{
+        site: settings.site,
+        logins: { cn: settings.accounts.cn.loggedIn, intl: settings.accounts.intl.loggedIn },
+        printerConfigured: Boolean(settings.printerHost),
+        tools: settings.tools,
+      }}
       modes={Object.entries(PRINT_MODES).map(([key, m]) => ({ key, label: m.label, description: m.description }))}
       defaults={DEFAULT_OPTIONS}
     />

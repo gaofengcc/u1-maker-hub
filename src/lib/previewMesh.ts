@@ -3,6 +3,7 @@
 /** Geometry for the 3D preview, fetched once per profile and plate (see /api/preview) or per upload. */
 
 import { isNoOrient, orientedBox, type Orient } from "./orient";
+import type { SiteId } from "./sites.ts";
 
 export type MeshData = {
   /** [minX, minY, minZ, maxX, maxY, maxZ] in mm. */
@@ -26,8 +27,8 @@ export function meshBox(mesh: MeshData, orient?: Orient): number[] {
   return box;
 }
 
-export function loadPreviewMesh(instanceId: number, plate: number): Promise<MeshData> {
-  return loadMesh(`/api/preview/${instanceId}?plate=${plate}`);
+export function loadPreviewMesh(instanceId: number, plate: number, site?: SiteId): Promise<MeshData> {
+  return loadMesh(`/api/preview/${instanceId}?plate=${plate}${site ? `&site=${site}` : ""}`);
 }
 
 export function loadUploadMesh(uploadId: string, plate = 1): Promise<MeshData> {

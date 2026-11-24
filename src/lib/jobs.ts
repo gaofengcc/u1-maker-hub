@@ -3,18 +3,19 @@ import path from "node:path";
 import crypto from "node:crypto";
 import { JOB_DIR, readSettings } from "./store.ts";
 import { downloadInstance, MakerWorldError } from "./makerworld.ts";
+import { downloadProfile, SnapmakerError } from "./snapmaker.ts";
 import { addGcodeThumbnails } from "./thumbnails.ts";
 import { plateFilaments, readPlateThumbnail, readProject } from "./threemf.ts";
 import { materialOf, presetForMaterial } from "./profiles.ts";
-import { sliceForU1, type PrintMode, type PrintOptions } from "./slicer.ts";
+import { sliceForU1, sliceSnapmakerProfile, type PrintMode, type PrintOptions } from "./slicer.ts";
 import type { PlateTransform } from "./geometry.ts";
 import type { PlateEntry } from "./plate.ts";
 import { combineProjects } from "./combine.ts";
-import { getStatus, runGcode, safeRemoteName, startPrint, uploadGcode } from "./printer.ts";
+import { getStatus, PrinterError, runGcode, safeRemoteName, startPrint, uploadGcode } from "./printer.ts";
 import { uploadCoverPath, uploadFilePath, uploadProjectPath, type UploadKind } from "./uploads.ts";
-import { isSiteId, type SiteId } from "./sites.ts";
+import { isSiteId, isSourceId, siteForSource, sourceForSite, type SiteId, type SourceId } from "./sites.ts";
 
-/** A print job: download from MakerWorld (or take an uploaded STL or 3MF), swap in U1 presets, slice, then optionally send to the printer. */
+/** 模型作业负责下载或读取文件、切片，并按需上传到 U1。Snapmaker Space 作业使用原配置并仅上传。 */
 
 export type StepKey = "download" | "presets" | "slice" | "upload" | "print";
 export type StepState = "pending" | "running" | "done" | "error" | "skipped";
@@ -23,8 +24,10 @@ export type Job = {
   id: string;
   createdAt: string;
   site: SiteId;
+  source: SourceId;
   designId: number;
   instanceId: number;
+  snapmaker?: { modelId: string; profileId?: string };
   title: string;
   cover: string;
   mode: PrintMode;
@@ -58,7 +61,7 @@ export type Job = {
 export type JobStats = { seconds: number | null; grams: number | null; toolChanges: number | null; gramsByFilament?: number[] };
 export type JobPlate = { gcode: string; project: string; stats: JobStats; remoteName: string | null; started?: boolean };
 
-export type NewJob = Pick<Job, "site" | "designId" | "instanceId" | "title" | "cover" | "mode" | "options" | "plate" | "transform" | "items" | "upload" | "filamentToTool" | "send" | "print">;
+export type NewJob = Pick<Job, "site" | "designId" | "instanceId" | "snapmaker" | "title" | "cover" | "mode" | "options" | "plate" | "transform" | "items" | "upload" | "filamentToTool" | "send" | "print"> & { source?: SourceId };
 
 export type PlateJobItem = Pick<
   PlateEntry,
@@ -90,7 +93,9 @@ export function getJob(id: string): Job | null {
   if (live) return live;
   try {
     const job = JSON.parse(fs.readFileSync(jobFile(id), "utf8")) as Job;
-    return { ...job, site: isSiteId(job.site) ? job.site : "intl" };
+    const site = isSiteId(job.site) ? job.site : "intl";
+    const source = isSourceId(job.source) ? job.source : sourceForSite(site);
+    return { ...job, site: siteForSource(source) ?? site, source, print: source === "sm-intl" ? false : job.print };
   } catch {
     return null;
   }
@@ -107,10 +112,15 @@ export function listJobs(limit = 20): Job[] {
 }
 
 export function createJob(input: NewJob): Job {
+  const site = isSiteId(input.site) ? input.site : "intl";
+  const source = isSourceId(input.source) ? input.source : sourceForSite(site);
+  const fromSnapmaker = source === "sm-intl";
+  if (fromSnapmaker && !input.snapmaker?.modelId) throw new Error("请选择 Snapmaker Space 模型。");
   const job: Job = {
     ...input,
-    site: isSiteId(input.site) ? input.site : "intl",
-    print: input.print ?? true,
+    site: siteForSource(source) ?? site,
+    source,
+    print: fromSnapmaker ? false : input.print ?? true,
     id: crypto.randomUUID(),
     createdAt: new Date().toISOString(),
     status: "running",
@@ -123,9 +133,9 @@ export function createJob(input: NewJob): Job {
             ? `Read the uploaded ${input.upload.kind === "3mf" ? "3MF" : "STL"}`
             : input.items?.some((i) => i.uploadId)
               ? "Gather the models"
-              : STEP_LABELS[key],
-      state: !input.send && (key === "upload" || key === "print") ? "skipped" : "pending",
-      detail: "",
+              : fromSnapmaker ? "下载 Snapmaker Space 3MF" : STEP_LABELS[key],
+      state: (!input.send && (key === "upload" || key === "print")) || (fromSnapmaker && (key === "presets" || key === "print")) ? "skipped" : "pending",
+      detail: fromSnapmaker && key === "presets" ? "使用模型自带的 U1 配置" : "",
     })),
     error: null,
     errorCode: null,
@@ -152,10 +162,13 @@ export function sendJob(id: string, plate = 1, print = true): Job {
   const count = job.plates?.length ?? 1;
   if (!Number.isInteger(plate) || plate < 1 || plate > count) throw new Error(`This job has no plate ${plate}.`);
   job.send = true;
-  job.print = print;
+  job.print = job.source !== "sm-intl" && print;
   job.status = "running";
   job.error = null;
-  for (const s of job.steps) if (s.key === "upload" || s.key === "print") s.state = "pending";
+  for (const s of job.steps) {
+    if (s.key === "upload") s.state = "pending";
+    if (s.key === "print") s.state = job.source === "sm-intl" ? "skipped" : "pending";
+  }
   registry.set(job.id, job);
   save(job);
   void runSend(job, plate);
@@ -166,6 +179,7 @@ export function sendJob(id: string, plate = 1, print = true): Job {
 export function printJob(id: string, plate = 1): Job {
   const job = getJob(id);
   if (!job) throw new Error("Job not found.");
+  if (job.source === "sm-intl") throw new PrinterError("Snapmaker Space 作业仅支持上传。", 409);
   if (job.status === "running") throw new Error("This job is still running.");
   const count = job.plates?.length ?? 1;
   if (!Number.isInteger(plate) || plate < 1 || plate > count) throw new Error(`This job has no plate ${plate}.`);
@@ -202,13 +216,18 @@ function fail(job: Job, err: unknown) {
   if (running) running.state = "error";
   job.status = "error";
   job.error = err instanceof Error ? err.message : String(err);
-  job.errorCode = err instanceof MakerWorldError ? err.code : null;
+  job.errorCode = err instanceof MakerWorldError || err instanceof SnapmakerError ? err.code : null;
   save(job);
 }
 
 async function runJob(job: Job) {
   const dir = path.join(JOB_DIR, job.id);
   try {
+    if (job.source === "sm-intl") {
+      await sliceSnapmakerJob(job, dir);
+      await finishJob(job);
+      return;
+    }
     const settings = readSettings();
     let inputs: string[];
     let mapping: number[];
@@ -284,10 +303,7 @@ async function runJob(job: Job) {
     job.filamentToTool = mapping;
 
     setStep(job, "slice", "running");
-    const onLog = (line: string) => {
-      job.log.push(line);
-      if (job.log.length > 400) job.log.splice(0, job.log.length - 400);
-    };
+    const onLog = (line: string) => logLine(job, line);
     // One slicer run per U1 plate, one after the other to keep memory use down.
     const plates: JobPlate[] = [];
     const adaptive: NonNullable<Awaited<ReturnType<typeof sliceForU1>>["layers"]>[] = [];
@@ -327,27 +343,50 @@ async function runJob(job: Job) {
         : " · adaptive layers not used, equal layers instead";
     setStep(job, "slice", "done", `${job.files.gcode.length} plate${job.files.gcode.length > 1 ? "s" : ""} sliced${layerNote}`);
 
-    if (job.send) await runSend(job, 1);
-    else {
-      job.status = "done";
-      save(job);
-    }
+    await finishJob(job);
   } catch (err) {
     fail(job, err);
+  }
+}
+
+async function sliceSnapmakerJob(job: Job, dir: string) {
+  if (!job.snapmaker) throw new Error("缺少 Snapmaker Space 模型信息。");
+  setStep(job, "download", "running");
+  const { modelId, profileId } = job.snapmaker;
+  const download = await downloadProfile(modelId, profileId);
+  setStep(job, "download", "done", download.cached ? `已缓存 · ${download.name}` : download.name);
+
+  setStep(job, "slice", "running");
+  const result = await sliceSnapmakerProfile({ input: download.file, workDir: path.join(dir, "slice"), onLog: (line) => logLine(job, line) });
+  job.files = { gcode: result.gcodeFiles, project: result.exported3mf };
+  job.stats = sumStats(result.gcodeFiles.map(readGcodeStats));
+  setStep(job, "slice", "done", `已切片 ${result.gcodeFiles.length} 盘`);
+}
+
+function logLine(job: Job, line: string) {
+  job.log.push(line);
+  if (job.log.length > 400) job.log.splice(0, job.log.length - 400);
+}
+
+async function finishJob(job: Job) {
+  if (job.send) await runSend(job, 1);
+  else {
+    job.status = "done";
+    save(job);
   }
 }
 
 async function runSend(job: Job, plate: number) {
   try {
     await uploadTarget(job, plate);
-    if (job.print === false) {
+    if (job.source === "sm-intl") {
+      setStep(job, "print", "skipped", "已上传");
+    } else if (job.print === false) {
       // Only the file goes to the printer: it waits in the file list until it is started there.
       setStep(job, "print", "pending", "已发送 · 在打印机上点“开始打印”");
-      job.status = "done";
-      save(job);
-      return;
+    } else {
+      await startTarget(job, plate);
     }
-    await startTarget(job, plate);
     job.status = "done";
     save(job);
   } catch (err) {
@@ -358,10 +397,12 @@ async function runSend(job: Job, plate: number) {
 /** Uploads the G-code of one plate to the printer; the print itself is started by startTarget. */
 async function uploadTarget(job: Job, plate: number) {
   const target = job.plates?.[plate - 1];
-  const gcode = target?.gcode ?? job.files.gcode[0];
+  const fromSnapmaker = job.source === "sm-intl";
+  const file = fromSnapmaker ? job.files.project : target?.gcode ?? job.files.gcode[0];
+  if (!file) throw new Error("缺少可上传的切片文件。");
   setStep(job, "upload", "running", target ? `plate ${plate} of ${job.plates!.length}` : "");
-  const remoteName = safeRemoteName(target ? `${job.title} plate ${plate}` : job.title);
-  const r = await uploadGcode(gcode, remoteName, false);
+  const remoteName = safeRemoteName(target ? `${job.title} plate ${plate}` : job.title) + (fromSnapmaker ? ".3mf" : "");
+  const r = await uploadGcode(file, remoteName, false);
   job.remoteName = r.item?.path ?? remoteName;
   if (target) target.remoteName = job.remoteName;
   setStep(job, "upload", "done", job.remoteName);
@@ -369,6 +410,8 @@ async function uploadTarget(job: Job, plate: number) {
 
 /** Tells the U1 which toolhead prints each filament, then starts the file already on the printer. */
 async function startTarget(job: Job, plate: number) {
+  // 在发出任何打印机命令之前，再检查作业是否允许启动。
+  if (job.source === "sm-intl") throw new PrinterError("Snapmaker Space 作业仅支持上传。", 409);
   const target = job.plates?.[plate - 1];
   const label = target ? ` · plate ${plate} of ${job.plates!.length}` : "";
   const remoteName = target?.remoteName ?? job.remoteName;
