@@ -292,6 +292,8 @@ export function PrinterView() {
           )}
         </aside>
       </div>
+
+      <FluiddConsole />
     </main>
   );
 }
@@ -403,5 +405,55 @@ function Slider({ label, unit, min, max, step, value, onCommit }: { label: strin
         }}
       />
     </label>
+  );
+}
+
+/**
+ * Fluidd 完整控制台：经 Cloudflare 隧道（print.peaklair.com）反代到打印机，
+ * 前置 nginx Basic Auth。iframe 默认收起，避免每次进页面都加载一次重资源。
+ */
+function FluiddConsole() {
+  const [open, setOpen] = useState(false);
+  return (
+    <section className="panel" style={{ marginTop: 20 }}>
+      <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+        <h2 style={{ margin: 0, flex: "1 1 200px" }}>打印机完整控制台</h2>
+        <button className="btn" type="button" onClick={() => setOpen((v) => !v)}>
+          {open ? "收起控制台" : "展开控制台"}
+        </button>
+        <a
+          className="btn"
+          href="https://print.peaklair.com"
+          target="_blank"
+          rel="noreferrer"
+          style={{ textDecoration: "none" }}
+        >
+          新窗口打开
+        </a>
+      </div>
+      <p className="small muted" style={{ lineHeight: 1.6 }}>
+        Fluidd 是打印机自带的全功能面板：手动控制轴与温度、管理 G-code 文件、看控制台日志、全屏摄像头、挤出校准。
+        第一次打开会弹出登录框，用户名 <code>fluidd</code>，密码与打印机控制台密码相同，验证一次后浏览器会记住。
+      </p>
+      {open && (
+        <iframe
+          src="https://print.peaklair.com"
+          title="Fluidd 控制台"
+          allow="fullscreen"
+          style={{
+            width: "100%",
+            height: "78vh",
+            minHeight: 520,
+            border: "1px solid rgba(255,255,255,0.12)",
+            borderRadius: 12,
+            background: "#0f1115",
+            marginTop: 8,
+          }}
+        />
+      )}
+      <p className="small muted" style={{ marginTop: 8 }}>
+        嵌在页面里打不开（空白或一直转圈）时，点「新窗口打开」，那是浏览器对跨域 iframe 的登录限制，不是故障。
+      </p>
+    </section>
   );
 }
