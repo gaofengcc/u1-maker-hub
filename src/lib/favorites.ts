@@ -86,7 +86,22 @@ export function removeFavorite(id: number, site?: SiteId): Favorite[] {
  */
 export function mergeMakerWorld(likes: ModelCard[], collects: ModelCard[], site?: SiteId): Favorite[] {
   const selectedSite = resolveSite(site);
-  const now = new Date().toISOString();
+  const nowMs = Date.now();
+  // MakerWorld returns each list newest-first and exposes no collection timestamp (only the model's
+  // createTime), so the position in the response is the only ordering signal we have. Rank by it:
+  // collected models first, then liked ones, one second apart, so "recent" means something.
+  const rank = new Map<string, number>();
+  for (const [cards, base] of [
+    [collects, 0],
+    [likes, 10_000],
+  ] as const) {
+    cards.forEach((card, i) => {
+      const key = `${selectedSite}:${card.id}`;
+      if (!rank.has(key)) rank.set(key, base + i);
+    });
+  }
+  const stamp = (key: string) => new Date(nowMs - (rank.get(key) ?? 0) * 1000).toISOString();
+
   const mw = new Map<string, { card: ModelCard; sources: FavoriteSource[] }>();
   for (const [cards, source] of [
     [likes, "mw-like"],
@@ -103,14 +118,21 @@ export function mergeMakerWorld(likes: ModelCard[], collects: ModelCard[], site?
   const kept = list
     .map((f) => {
       if (f.site !== selectedSite) return f;
-      const fromMw = mw.get(`${selectedSite}:${f.id}`);
-      const sources = [...sourcesOf(f).filter((s) => s === "app"), ...(fromMw?.sources ?? [])];
-      return { ...f, ...(fromMw ? snapshot(fromMw.card) : {}), sources };
+      const key = `${f.site}:${f.id}`;
+      const fromMw = mw.get(key);
+      const previous = sourcesOf(f);
+      const sources = [...previous.filter((s) => s === "app"), ...(fromMw?.sources ?? [])];
+      // Refresh the card and its rank. A model saved in the app too keeps its own timestamp so the
+      // user's own save does not jump around.
+      const savedAt = fromMw && !previous.includes("app") ? stamp(key) : f.savedAt;
+      return { ...f, ...(fromMw ? snapshot(fromMw.card) : {}), savedAt, sources };
     })
     .filter((f) => f.sources!.length > 0);
   const known = new Set(list.map((f) => `${f.site}:${f.id}`));
-  // New on MakerWorld: first seen now, in the order MakerWorld lists them (newest first).
-  const added = [...mw.values()].filter((e) => !known.has(`${selectedSite}:${e.card.id}`)).map((e) => ({ ...snapshot(e.card), savedAt: now, site: selectedSite, sources: e.sources }));
+  // New on MakerWorld: stamped by their rank so the list keeps the account's own order.
+  const added = [...mw.entries()]
+    .filter(([key]) => !known.has(key))
+    .map(([key, e]) => ({ ...snapshot(e.card), savedAt: stamp(key), site: selectedSite, sources: e.sources }));
   write([...added, ...kept]);
   return listFavorites();
 }

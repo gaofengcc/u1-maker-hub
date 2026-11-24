@@ -24,9 +24,10 @@ export function footprint(bbox: number[], scale: number, rotation: number): [num
 export type Placement = { x: number; y: number } | null;
 
 /**
- * Centres the placed group on the bed so small models sit in the middle instead of hugging the
- * front-left corner. Returns the input untouched when centring would push a model off the bed or
- * into the prime tower corner, so the result is always a legal layout.
+ * Centres the placed group on the bed so models sit in the middle instead of hugging the front-left
+ * corner. Returns the input untouched when centring would push a model off the print area, so the
+ * result is always placeable. Centring deliberately ignores the prime tower corner: a group that
+ * fits only by overlapping it is still better centred, and OrcaSlicer moves the tower itself.
  */
 function centreOnBed(result: Placement[], sizes: { w: number; d: number }[]): Placement[] {
   const left = U1_BED.minX + MARGIN;
@@ -55,31 +56,28 @@ function centreOnBed(result: Placement[], sizes: { w: number; d: number }[]): Pl
   if (minX + dx < left - 1e-6 || maxX + dx > right + 1e-6) return result;
   if (minY + dy < front - 1e-6 || maxY + dy > back + 1e-6) return result;
 
-  // Never shift anything into the prime tower corner.
-  const clashes = sizes.some((s, i) => {
-    const p = result[i];
-    if (!p) return false;
-    const x = p.x + dx - s.w / 2;
-    const y = p.y + dy - s.d / 2;
-    return !(
-      x + s.w <= TOWER_ZONE.minX ||
-      x >= TOWER_ZONE.maxX ||
-      y + s.d <= TOWER_ZONE.minY ||
-      y >= TOWER_ZONE.maxY
-    );
-  });
-  if (clashes) return result;
-
   return result.map((p) => (p ? { x: p.x + dx, y: p.y + dy } : null));
 }
 
 /**
- * Shelf packing, front to back: rows of models from the front-left corner, deepest first, skipping
- * the prime tower corner. Footprints marked `first` are placed before the others. Returns each
- * footprint's centre on the bed, or null when it does not fit. The finished group is then centred
- * on the bed.
+ * Shelf packing, front to back: rows of models from the front-left corner, deepest first.
+ * Footprints marked `first` are placed before the others. Returns each footprint's centre on the
+ * bed, or null when it does not fit.
+ *
+ * Two passes, strict first: keep the prime tower corner free when possible, and fall back to
+ * ignoring it when that is the only way to fit a large model. OrcaSlicer relocates the prime tower
+ * itself, so sharing its corner beats refusing to place the model at all.
  */
 export function packPlate(sizes: { w: number; d: number; first?: boolean }[]): Placement[] {
+  const strict = pack(sizes, true);
+  if (strict.every((p) => p !== null)) return centreOnBed(strict, sizes);
+  // Something did not fit: retry without reserving the tower corner, then centre whatever landed.
+  const relaxed = pack(sizes, false);
+  return centreOnBed(relaxed, sizes);
+}
+
+/** One packing pass. `avoidTower` keeps the prime tower corner free when it can. */
+function pack(sizes: { w: number; d: number; first?: boolean }[], avoidTower: boolean): Placement[] {
   const left = U1_BED.minX + MARGIN;
   const right = U1_BED.maxX - MARGIN;
   const back = U1_BED.maxY - MARGIN;
@@ -91,8 +89,14 @@ export function packPlate(sizes: { w: number; d: number; first?: boolean }[]): P
   let rowDepth = 0;
   let cursor = left;
 
-  const clearOfTower = (x: number, y: number, w: number, d: number) =>
-    x + w <= TOWER_ZONE.minX || x >= TOWER_ZONE.maxX || y + d <= TOWER_ZONE.minY || y >= TOWER_ZONE.maxY ? x : Math.max(x, TOWER_ZONE.maxX + GAP);
+  const clearOfTower = (x: number, y: number, w: number, d: number) => {
+    if (!avoidTower) return x;
+    const overlaps = !(x + w <= TOWER_ZONE.minX || x >= TOWER_ZONE.maxX || y + d <= TOWER_ZONE.minY || y >= TOWER_ZONE.maxY);
+    if (!overlaps) return x;
+    // Step past the tower only when the model still fits there; otherwise take the corner.
+    const shifted = Math.max(x, TOWER_ZONE.maxX + GAP);
+    return shifted + w <= right ? shifted : x;
+  };
 
   for (const i of order) {
     const { w, d } = sizes[i];
@@ -108,7 +112,7 @@ export function packPlate(sizes: { w: number; d: number; first?: boolean }[]): P
     cursor = x + w + GAP;
     rowDepth = Math.max(rowDepth, d);
   }
-  return centreOnBed(result, sizes);
+  return result;
 }
 
 export type BedPlacement = { bed: number; x: number; y: number } | null;
