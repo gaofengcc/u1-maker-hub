@@ -37,6 +37,11 @@ export function SettingsView({ initial, filaments }: { initial: PublicSettings; 
 
 function SessionPanel() {
   const [busy, setBusy] = useState(false);
+  const [pwBusy, setPwBusy] = useState(false);
+  const [current, setCurrent] = useState("");
+  const [next, setNext] = useState("");
+  const [confirm, setConfirm] = useState("");
+  const [pwMsg, setPwMsg] = useState<{ kind: "ok" | "err"; text: string } | null>(null);
 
   async function logout() {
     setBusy(true);
@@ -53,6 +58,41 @@ function SessionPanel() {
     }
   }
 
+  async function changePassword(event: React.FormEvent) {
+    event.preventDefault();
+    if (pwBusy) return;
+    setPwMsg(null);
+    if (next.length < 6) {
+      setPwMsg({ kind: "err", text: "新密码至少 6 位" });
+      return;
+    }
+    if (next !== confirm) {
+      setPwMsg({ kind: "err", text: "两次输入的新密码不一致" });
+      return;
+    }
+    setPwBusy(true);
+    try {
+      const res = await fetch("/api/session/password", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ currentPassword: current, newPassword: next }),
+      });
+      const data = (await res.json().catch(() => ({}))) as { error?: string };
+      if (res.ok) {
+        setCurrent("");
+        setNext("");
+        setConfirm("");
+        setPwMsg({ kind: "ok", text: "密码已修改，其它设备上的登录已失效" });
+      } else {
+        setPwMsg({ kind: "err", text: data.error || "修改失败，请重试" });
+      }
+    } catch {
+      setPwMsg({ kind: "err", text: "连不上服务，请检查网络" });
+    } finally {
+      setPwBusy(false);
+    }
+  }
+
   return (
     <section className="panel">
       <h2>登录状态</h2>
@@ -62,6 +102,49 @@ function SessionPanel() {
       <button type="button" className="btn" disabled={busy} onClick={logout}>
         {busy ? "退出中…" : "退出登录"}
       </button>
+
+      <h3 style={{ margin: "20px 0 6px", fontSize: 16 }}>修改访问密码</h3>
+      <p className="small muted" style={{ lineHeight: 1.5, marginTop: 0 }}>
+        改完之后，这台设备保持登录，其它设备上的登录会立即失效，需要用新密码重新登录。
+      </p>
+      <form onSubmit={changePassword} style={{ display: "flex", flexDirection: "column", gap: 10, maxWidth: 360 }}>
+        <input
+          className="input"
+          type="password"
+          autoComplete="current-password"
+          placeholder="当前密码"
+          value={current}
+          onChange={(event) => setCurrent(event.target.value)}
+        />
+        <input
+          className="input"
+          type="password"
+          autoComplete="new-password"
+          placeholder="新密码（至少 6 位）"
+          value={next}
+          onChange={(event) => setNext(event.target.value)}
+        />
+        <input
+          className="input"
+          type="password"
+          autoComplete="new-password"
+          placeholder="再输一次新密码"
+          value={confirm}
+          onChange={(event) => setConfirm(event.target.value)}
+        />
+        <button type="submit" className="btn btn-primary" disabled={pwBusy || !current || !next || !confirm}>
+          {pwBusy ? "提交中…" : "修改密码"}
+        </button>
+        {pwMsg && (
+          <p
+            role="status"
+            className="small"
+            style={{ margin: 0, color: pwMsg.kind === "ok" ? "#2e7d32" : "#c62828" }}
+          >
+            {pwMsg.text}
+          </p>
+        )}
+      </form>
     </section>
   );
 }
