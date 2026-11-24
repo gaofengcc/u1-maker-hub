@@ -149,8 +149,18 @@ export async function getModel(id: string): Promise<SnapmakerModelDetail> {
 
 // ---------- 签名下载 ----------
 
-function requireToken(): string {
-  let auth: { access?: unknown } | null;
+// ---------- 登录凭据 ----------
+
+/** Snapmaker 前端内置的公开客户端凭据，base64("mall-app:123456")，不是私密信息。 */
+const OAUTH_TOKEN_URL = "https://api.snapmaker.com/api/oauth2/token";
+const OAUTH_BASIC = Buffer.from("mall-app:123456").toString("base64");
+/** 提前这么久就刷新，避免请求途中过期。 */
+const REFRESH_AHEAD_SECONDS = 120;
+
+type Credentials = { access: string; refresh: string };
+
+function readCredentials(): Credentials {
+  let auth: { access?: unknown; refresh?: unknown } | null;
   try {
     auth = JSON.parse(fs.readFileSync(AUTH_FILE, "utf8"));
   } catch (err) {
@@ -159,18 +169,80 @@ function requireToken(): string {
       : "无法读取 data/snapmaker-auth.json，请检查文件权限和 JSON 格式。";
     throw new SnapmakerError(message, 403, "login_required");
   }
-  const token = typeof auth?.access === "string" ? auth.access.trim() : "";
-  if (!token) throw new SnapmakerError("data/snapmaker-auth.json 缺少 access token。", 403, "login_required");
+  const access = typeof auth?.access === "string" ? auth.access.trim() : "";
+  const refresh = typeof auth?.refresh === "string" ? auth.refresh.trim() : "";
+  if (!access) throw new SnapmakerError("data/snapmaker-auth.json 缺少 access token。", 403, "login_required");
+  return { access, refresh };
+}
 
-  // 本地读取 JWT 有效期，令牌仍由 Snapmaker 验证。
-  let exp: number | undefined;
+/** 读出 JWT 的 exp（秒）；格式不对返回 null。令牌仍由 Snapmaker 校验，这里只看有效期。 */
+function tokenExpiry(token: string): number | null {
   try {
-    exp = JSON.parse(Buffer.from(token.split(".")[1], "base64url").toString("utf8")).exp;
+    const payload = JSON.parse(Buffer.from(token.split(".")[1], "base64url").toString("utf8"));
+    const exp = payload?.exp;
+    return typeof exp === "number" && Number.isFinite(exp) ? exp : null;
   } catch {
-    throw expiredToken();
+    return null;
   }
-  if (typeof exp !== "number" || !Number.isFinite(exp) || exp <= Date.now() / 1000) throw expiredToken();
-  return token;
+}
+
+/** 原子写入并收紧权限，避免留下半截文件或被别的账号读到。 */
+function saveCredentials(credentials: Credentials) {
+  const temporary = `${AUTH_FILE}.${randomUUID()}.tmp`;
+  try {
+    fs.writeFileSync(temporary, `${JSON.stringify(credentials, null, 2)}\n`, { mode: 0o600 });
+    fs.renameSync(temporary, AUTH_FILE);
+  } finally {
+    fs.rmSync(temporary, { force: true });
+  }
+}
+
+/** 同时只有一个刷新在飞，多个请求撞上过期时共用结果。 */
+let refreshing: Promise<string> | null = null;
+
+/**
+ * 用 refresh_token 换新的 access_token。
+ *
+ * 两个坑都是实测出来的：接口只收表单编码（发 JSON 会得到 invalid_request 400），
+ * 而且每次刷新都会轮换 refresh_token，新值必须立刻落盘，否则这份凭据当场作废。
+ */
+function refreshAccessToken(): Promise<string> {
+  if (refreshing) return refreshing;
+  refreshing = (async () => {
+    const { refresh } = readCredentials();
+    if (!refresh) throw expiredToken();
+    const res = await fetch(OAUTH_TOKEN_URL, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+        Authorization: `Basic ${OAUTH_BASIC}`,
+        Accept: "application/json",
+        "User-Agent": HEADERS["User-Agent"],
+        "accept-language": "en-US,en;q=0.9",
+      },
+      body: new URLSearchParams({ grant_type: "refresh_token", refresh_token: refresh }),
+      cache: "no-store",
+    });
+    const body = (await res.json().catch(() => null)) as
+      | { code?: number; data?: { access_token?: string; refresh_token?: string } }
+      | null;
+    const access = body?.data?.access_token;
+    if (body?.code !== 200 || typeof access !== "string" || !access) throw expiredToken();
+    saveCredentials({ access, refresh: body.data?.refresh_token ?? refresh });
+    return access;
+  })().finally(() => {
+    refreshing = null;
+  });
+  return refreshing;
+}
+
+/** 还有余量就直接用，快过期或已过期就先刷一次。 */
+async function requireToken(): Promise<string> {
+  const { access } = readCredentials();
+  const exp = tokenExpiry(access);
+  if (exp === null) throw expiredToken();
+  if (exp - Date.now() / 1000 > REFRESH_AHEAD_SECONDS) return access;
+  return refreshAccessToken();
 }
 
 type Download = { file: string; name: string; cached: boolean };
@@ -193,13 +265,19 @@ function cachedDownload(file: string): Download | undefined {
 export async function downloadProfile(id: string, profileId?: string): Promise<Download> {
   checkId(id);
   if (profileId !== undefined) checkId(profileId);
-  const token = requireToken();
   if (profileId !== undefined) {
     const cached = cachedDownload(path.join(CACHE_DIR, `${id}-${profileId}.3mf`));
     if (cached) return cached;
   }
 
-  const links = await call<SignedLinks>(`/api/model/download/${id}`, token);
+  // 服务端提前作废令牌时（比如在别处登录过），刷新一次再重试，不用人工干预。
+  let links: SignedLinks;
+  try {
+    links = await call<SignedLinks>(`/api/model/download/${id}`, await requireToken());
+  } catch (err) {
+    if (!(err instanceof SnapmakerError && err.code === "token_expired")) throw err;
+    links = await call<SignedLinks>(`/api/model/download/${id}`, await refreshAccessToken());
+  }
   const profile = profileId === undefined ? links.printProfiles?.[0] : links.printProfiles?.find((p) => String(p.profileId) === profileId);
   if (profileId !== undefined && !profile) throw new SnapmakerError("Snapmaker Space 上找不到此打印配置。", 404, "not_found");
   const selectedId = profile ? String(profile.profileId) : "model";
