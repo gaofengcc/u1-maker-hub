@@ -1,4 +1,5 @@
 import { metricsFromTriangles, recommendFromMetrics } from "../src/lib/recommend.ts";
+import { extractHints } from "../src/lib/modelHints.ts";
 import { optionsToOverrides, DEFAULT_OPTIONS, type PrintOptions } from "../src/lib/slicer.ts";
 import type { Triangle } from "../src/lib/recommend.ts";
 
@@ -83,6 +84,35 @@ const flatRec = recommendFromMetrics(flat);
 if (tallRec.recommend.options.brim === flatRec.recommend.options.brim) throw new Error("细高件与扁大件 brim 未区分");
 if (tallRec.recommend.overrides.outer_wall_speed === flatRec.recommend.overrides.outer_wall_speed) throw new Error("细高件与扁大件速度未区分");
 if (tallRec.recommend.options.wallLoops === flatRec.recommend.options.wallLoops) throw new Error("细高件与扁大件墙数未区分");
+
+// 作者说明解析与优先级覆盖。
+const realSummary = `<p>推荐设置</p><ul><li>层高：0.16mm 或 0.20mm（以获得最大保真度）</li><li>填充：10-15%</li><li>支撑：🚫 禁止！目的是测试打印机的极限</li><li>材料：适用于 PLA、PETG 或 ABS</li></ul>`;
+const realHints = extractHints(realSummary);
+if (realHints.supports !== "forbidden") throw new Error("真实说明应识别为禁止支撑");
+if (realHints.layerHeight?.min !== 0.16 || realHints.layerHeight?.max !== 0.2) throw new Error("真实说明层高范围错误");
+if (realHints.infill?.min !== 10 || realHints.infill?.max !== 15) throw new Error("真实说明填充范围错误");
+if (!realHints.materials?.includes("PLA")) throw new Error("真实说明材料未识别 PLA");
+if (!realHints.quotes.some((quote) => quote.sentence.includes("支撑") && quote.sentence.includes("禁止"))) throw new Error("真实说明未保留禁止支撑原句");
+
+const englishHints = extractHints("Layer height: 0.2mm. Infill 15%. No supports needed.");
+if (englishHints.supports !== "forbidden") throw new Error("英文说明应识别为禁止支撑");
+if (englishHints.layerHeight?.min !== 0.2 || englishHints.layerHeight?.max !== 0.2) throw new Error("英文说明层高错误");
+if (englishHints.infill?.min !== 15 || englishHints.infill?.max !== 15) throw new Error("英文说明填充错误");
+
+if (extractHints("需要支撑").supports !== "required") throw new Error("需要支撑应识别为必需");
+if (extractHints("谢谢下载").quotes.length !== 0) throw new Error("无关说明不应产生命中");
+
+const forbiddenHints = extractHints("支撑：🚫 禁止");
+const forcedOff = recommendFromMetrics(metricWithOverhang(40), { hints: forbiddenHints });
+if (forcedOff.recommend.options.supports !== "off" || forcedOff.speed.options.supports !== "off") throw new Error("作者禁止支撑时两档都应关闭");
+if (!forcedOff.recommend.reasons.some((reason) => reason.includes("作者说明"))) throw new Error("支撑覆盖理由应引用作者说明");
+
+const rangedHints = extractHints("层高：0.16mm 或 0.20mm。填充：10-15%");
+const rangedRec = recommendFromMetrics(metricWithOverhang(5), { hints: rangedHints });
+if (rangedRec.recommend.overrides.layer_height !== "0.16") throw new Error("推荐档层高未夹到0.16");
+if (rangedRec.speed.overrides.layer_height !== "0.20") throw new Error("最快档层高应保持0.20");
+if (rangedRec.recommend.options.infillDensity !== 15) throw new Error("推荐档填充未夹到15");
+if (rangedRec.speed.options.infillDensity !== 12) throw new Error("最快档填充应保持区间内12");
 console.log("verify-recommend: PASS");
 console.log(`cube volume=${box.volumeMm3} surface=${box.surfaceAreaMm2} overhang45=${box.overhang45Percent}% bed=${box.bedContactAreaMm2}`);
 console.log(`slope45 overhang45=${slope.overhang45Percent.toFixed(2)}% area=${slope.surfaceAreaMm2.toFixed(2)}`);
