@@ -110,6 +110,9 @@ export type PrintOptions = {
   seam: "aligned" | "back" | "nearest" | "random";
   /** fixed: the preset's layer height. adaptive: thinner on gentle slopes. balanced: also thicker on steep walls. */
   layers: "fixed" | "adaptive" | "balanced";
+  /** 悬垂专项覆盖。省略或 auto 时使用推荐值。 */
+  supportAngle?: "auto" | 35 | 40 | 45;
+  overhangSpeed?: "auto" | "standard" | "slow" | "off";
 };
 
 export const DEFAULT_OPTIONS: PrintOptions = {
@@ -143,6 +146,25 @@ export function optionsToOverrides(o: PrintOptions): Record<string, string> {
     brim_type: { none: "no_brim", auto: "auto_brim", always: "outer_only" }[o.brim],
     ironing_type: o.ironing ? "top" : "no ironing",
     seam_position: o.seam,
+    ...(o.supportAngle !== undefined && o.supportAngle !== "auto"
+      ? { support_threshold_angle: String(o.supportAngle) }
+      : {}),
+    ...(o.overhangSpeed !== undefined && o.overhangSpeed !== "auto"
+      ? (() => {
+          const speeds = {
+            standard: [0, 50, 35, 15, 50],
+            slow: [0, 40, 25, 10, 40],
+            off: [0, 50, 30, 10, 50],
+          }[o.overhangSpeed];
+          return {
+            overhang_1_4_speed: String(speeds[0]),
+            overhang_2_4_speed: String(speeds[1]),
+            overhang_3_4_speed: String(speeds[2]),
+            overhang_4_4_speed: String(speeds[3]),
+            overhang_totally_speed: String(speeds[4]),
+          };
+        })()
+      : {}),
   };
 }
 

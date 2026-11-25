@@ -1,4 +1,5 @@
 import { metricsFromTriangles, recommendFromMetrics } from "../src/lib/recommend.ts";
+import { optionsToOverrides, DEFAULT_OPTIONS, type PrintOptions } from "../src/lib/slicer.ts";
 import type { Triangle } from "../src/lib/recommend.ts";
 
 function cube(size: number): Triangle[] {
@@ -6,6 +7,29 @@ function cube(size: number): Triangle[] {
   const f = [[0,2,1],[0,3,2],[4,5,6],[4,6,7],[0,1,5],[0,5,4],[1,2,6],[1,6,5],[2,3,7],[2,7,6],[3,0,4],[3,4,7]];
   return f.map(([a,b,c]) => [...v[a], ...v[b], ...v[c]] as unknown as Triangle);
 }
+
+
+function metricWithOverhang(overhang45Percent: number, overhang60Percent = 0): Parameters<typeof recommendFromMetrics>[0] {
+  return {
+    bbox: [0, 0, 0, 20, 20, 20], volumeMm3: 8000, surfaceAreaMm2: 2400,
+    overhang45Percent, overhang60Percent, bedContactAreaMm2: 400, heightMm: 20,
+    baseAreaMm2: 400, heightToBaseRatio: 1, thinFeatureScore: 0, triangleCount: 12,
+  };
+}
+
+const severeRec = recommendFromMetrics(metricWithOverhang(30, 10));
+if (severeRec.recommend.overrides.support_threshold_angle !== "35") throw new Error("严重悬垂支撑角应为35");
+const moderateRec = recommendFromMetrics(metricWithOverhang(18));
+if (moderateRec.recommend.overrides.support_threshold_angle !== "40") throw new Error("中等悬垂支撑角应为40");
+const lowRec = recommendFromMetrics(metricWithOverhang(5));
+if (lowRec.recommend.overrides.support_threshold_angle !== "45") throw new Error("轻微悬垂支撑角应为45");
+if (recommendFromMetrics(metricWithOverhang(5), { materialType: "PETG" }).recommend.overrides.support_top_z_distance !== "0.25") throw new Error("PETG支撑间隙应为0.25");
+if (recommendFromMetrics(metricWithOverhang(5), { materialType: "PLA" }).recommend.overrides.support_top_z_distance !== "0.2") throw new Error("PLA支撑间隙应为0.2");
+const baseOptions: PrintOptions = { ...DEFAULT_OPTIONS, supports: "off" };
+const slowOverrides = optionsToOverrides({ ...baseOptions, overhangSpeed: "slow" });
+if (slowOverrides.overhang_2_4_speed !== "40" || slowOverrides.overhang_3_4_speed !== "25" || slowOverrides.overhang_4_4_speed !== "10" || slowOverrides.overhang_totally_speed !== "40") throw new Error("slow悬垂降速映射错误");
+const autoOverrides = optionsToOverrides({ ...baseOptions, overhangSpeed: "auto" });
+if (Object.keys(autoOverrides).some((key) => key.startsWith("overhang_"))) throw new Error("auto不应覆盖悬垂降速");
 
 const box = metricsFromTriangles(cube(20));
 if (Math.abs(box.volumeMm3 - 8000) > 1e-6) throw new Error(`立方体体积错误 ${box.volumeMm3}`);

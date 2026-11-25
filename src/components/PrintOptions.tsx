@@ -70,6 +70,19 @@ function presetOptions(base: Options, preset?: RecommendationPreset | null) {
   return { ...base, ...(preset?.options ?? {}) };
 }
 
+function overhangSummary(preset: RecommendationPreset | null | undefined, options: Options, material: string | undefined) {
+  const overrides = preset?.overrides ?? {};
+  const angle = overrides.support_threshold_angle ?? "45";
+  const speeds = [
+    overrides.overhang_2_4_speed ?? "40",
+    overrides.overhang_3_4_speed ?? "25",
+    overrides.overhang_4_4_speed ?? "10",
+  ].join("/");
+  if (options.supports === "off") return t("print.overhangSummaryOff", { speeds });
+  const gap = overrides.support_top_z_distance ?? "0.2";
+  return t("print.overhangSummary", { angle, speeds, gap, material: material || "PLA" });
+}
+
 function Estimate({ value, exact }: { value?: EstimateValue | null; exact?: boolean }) {
   return (
     <span className="muted small">
@@ -220,6 +233,46 @@ function FineTunePanel({ value, defaults, onChange, creatorSupports = null }: Pi
 
       <div className="opt-row">
         <div className="opt-text">
+          <span className="opt-title">{t("print.supportAngle")}</span>
+          <span className="opt-desc">{t("print.supportAngleDesc")}</span>
+        </div>
+        <div className="opt-control">
+          <Seg
+            label={t("print.supportAngle")}
+            value={value.supportAngle ?? "auto"}
+            options={[["auto", t("print.supportAngleAuto")], [35, "35°"], [40, "40°"], [45, "45°"]]}
+            onChange={(v) => {
+              const next = { ...value };
+              if (v === "auto") delete next.supportAngle;
+              else next.supportAngle = v as 35 | 40 | 45;
+              onChange(next);
+            }}
+          />
+        </div>
+      </div>
+
+      <div className="opt-row">
+        <div className="opt-text">
+          <span className="opt-title">{t("print.overhangSpeed")}</span>
+          <span className="opt-desc">{t("print.overhangSpeedDesc")}</span>
+        </div>
+        <div className="opt-control">
+          <Seg
+            label={t("print.overhangSpeed")}
+            value={value.overhangSpeed ?? "auto"}
+            options={[["auto", t("print.overhangSpeedAuto")], ["standard", t("print.overhangSpeedStandard")], ["slow", t("print.overhangSpeedSlow")], ["off", t("print.overhangSpeedOff")]]}
+            onChange={(v) => {
+              const next = { ...value };
+              if (v === "auto") delete next.overhangSpeed;
+              else next.overhangSpeed = v as "standard" | "slow" | "off";
+              onChange(next);
+            }}
+          />
+        </div>
+      </div>
+
+      <div className="opt-row">
+        <div className="opt-text">
           <span className="opt-title">
             {t("print.brim")} <Tag kind="success" />
           </span>
@@ -330,6 +383,7 @@ export function PrintOptionsPanel(props: PrintOptionsPanelProps) {
 
   const recommend = loaded?.recommend;
   const speed = loaded?.speed;
+  const material = creatorPreset?.material ?? modelPreset?.material ?? "PLA";
   const recOptions = useMemo(() => presetOptions(defaults, recommend), [defaults, recommend]);
   const speedOptions = useMemo(() => presetOptions(defaults, speed), [defaults, speed]);
   const rough: Record<string, EstimateValue | null> = {
@@ -415,7 +469,7 @@ export function PrintOptionsPanel(props: PrintOptionsPanelProps) {
       {active === "recommend" && (
         <div>
           <div className="opt-row" style={{ display: "block" }}>
-            <div className="opt-text"><span className="opt-title">{t("print.recommendTitle")}</span><span className="opt-desc">{(recommend?.reasons ?? [t("print.recommendFallback")]).join("；")}</span></div>
+            <div className="opt-text"><span className="opt-title">{t("print.recommendTitle")}</span><span className="opt-desc">{(recommend?.reasons ?? [t("print.recommendFallback")]).join("；")}</span><span className="opt-hint">{overhangSummary(recommend, recOptions, material)}</span></div>
             <button type="button" className="btn btn-sm" onClick={() => { apply(recOptions); onOverridesChange?.(recommend?.overrides ?? {}); if (recommend?.mode) onPresetMode?.(recommend.mode); }}>{t("print.usePreset")}</button>
           </div>
           <Estimate value={exact.recommend ?? rough.recommend} exact={Boolean(exact.recommend)} />
@@ -424,7 +478,7 @@ export function PrintOptionsPanel(props: PrintOptionsPanelProps) {
       {active === "speed" && (
         <div>
           <div className="opt-row" style={{ display: "block" }}>
-            <div className="opt-text"><span className="opt-title">{t("print.speedTitle")}</span><span className="opt-desc">{(speed?.reasons ?? [t("print.speedFallback")]).join("；")}</span></div>
+            <div className="opt-text"><span className="opt-title">{t("print.speedTitle")}</span><span className="opt-desc">{(speed?.reasons ?? [t("print.speedFallback")]).join("；")}</span><span className="opt-hint">{overhangSummary(speed, speedOptions, material)}</span></div>
             <button type="button" className="btn btn-sm" onClick={() => { apply(speedOptions); onOverridesChange?.(speed?.overrides ?? {}); if (speed?.mode) onPresetMode?.(speed.mode); }}>{t("print.usePreset")}</button>
           </div>
           <Estimate value={exact.speed ?? rough.speed} exact={Boolean(exact.speed)} />

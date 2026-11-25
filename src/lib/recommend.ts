@@ -126,34 +126,48 @@ export type RecommendationPreset = {
 export type Recommendations = { recommend: RecommendationPreset; speed: RecommendationPreset };
 
 /** 按几何特征生成两套 U1 参数。所有原因都带有本次模型的实际数字，便于用户核对。 */
-export function recommendFromMetrics(metrics: PlateMetrics, _model: RecommendationModel = {}): Recommendations {
+export function recommendFromMetrics(metrics: PlateMetrics, model: RecommendationModel = {}): Recommendations {
   const overhang = metrics.overhang45Percent;
+  const severeOverhang = metrics.overhang60Percent;
   const tall = metrics.heightToBaseRatio >= 4 || (metrics.heightMm >= 100 && metrics.baseAreaMm2 > 0 && metrics.heightToBaseRatio >= 3);
   const needsSupport = overhang >= 12;
-  const supportAngle = overhang >= 30 ? 35 : 40;
+  const supportAngle = severeOverhang >= 8 || overhang >= 25 ? 35 : overhang >= 12 ? 40 : 45;
+  const material = (model.materialType ?? "PLA").toUpperCase();
+  const supportGap = material === "PETG" || material === "TPU" ? "0.25" : "0.2";
   const brim = tall || metrics.bedContactAreaMm2 < 250 ? "always" : "auto";
   const wallLoops = tall ? 4 : 3;
   const speedWalls = tall ? 2 : 3;
   const speed = tall ? "150" : "190";
   const baseText = `贴床面 ${metrics.bedContactAreaMm2.toFixed(1)} mm²且高度 ${metrics.heightMm.toFixed(1)} mm`;
+  const overhangReason = `悬垂 ${overhang.toFixed(1)}%（>45°）、严重悬垂 ${severeOverhang.toFixed(1)}%（>60°）→ 支撑角 ${supportAngle}°（宁可多支撑，防塌陷）`;
+  const supportSummary = needsSupport ? `开启树状支撑，${overhangReason}` : `不开启支撑，${overhangReason}`;
 
   const recommendReasons = [
     `层高 0.12 mm、墙数 ${wallLoops} 圈、填充 18%（gyroid），兼顾细节与强度`,
     `${baseText}，高/底宽比 ${metrics.heightToBaseRatio.toFixed(2)} → ${brim === "always" ? "加 5 mm brim" : "使用自动 brim"}`,
+    `悬垂专项：${supportSummary}`,
   ];
-  if (needsSupport) recommendReasons.push(`悬垂 ${overhang.toFixed(1)}%（>45°）→ 开启树状支撑，支撑角 ${supportAngle}°`);
-  else recommendReasons.push(`悬垂 ${overhang.toFixed(1)}%（>45°）→ 暂不开启支撑`);
   if (tall) recommendReasons.push(`细高件高度 ${metrics.heightMm.toFixed(1)} mm、高/底宽比 ${metrics.heightToBaseRatio.toFixed(2)} → 外壁速度降至 ${speed} mm/s`);
 
   const speedReasons = [
     `层高 0.20 mm、墙数 ${speedWalls} 圈、填充 12%（gyroid），预计比精细档更快`,
     `外壁速度 ${speed} mm/s，保留表面稳定性并避免极限速度波纹`,
     `${baseText}，高/底宽比 ${metrics.heightToBaseRatio.toFixed(2)} → ${brim === "always" ? "加 5 mm brim" : "使用自动 brim"}`,
+    `悬垂专项：${supportSummary}`,
   ];
-  if (needsSupport) speedReasons.push(`悬垂 ${overhang.toFixed(1)}%（>45°）→ 开启树状支撑，支撑角 ${supportAngle}°`);
-  else speedReasons.push(`悬垂 ${overhang.toFixed(1)}%（>45°）→ 支撑关闭以减少耗材`);
   if (overhang >= 30) speedReasons.push(`悬垂 ${overhang.toFixed(1)}%（>45°）→ 建议改朝向`);
 
+  const commonOverrides = {
+    support_threshold_angle: String(supportAngle),
+    support_top_z_distance: supportGap,
+    support_bottom_z_distance: supportGap,
+    support_interface_top_layers: "3",
+    overhang_1_4_speed: "0",
+    overhang_2_4_speed: "40",
+    overhang_3_4_speed: "25",
+    overhang_4_4_speed: "10",
+    overhang_totally_speed: "40",
+  };
   return {
     recommend: {
       mode: "fine",
@@ -163,7 +177,7 @@ export function recommendFromMetrics(metrics: PlateMetrics, _model: Recommendati
       },
       overrides: {
         layer_height: "0.12", outer_wall_speed: tall ? "150" : "180", top_shell_layers: "5", bottom_shell_layers: "4",
-        support_threshold_angle: String(supportAngle), seam_slope_type: "external", seam_slope_conditional: "1",
+        ...commonOverrides, seam_slope_type: "external", seam_slope_conditional: "1",
       },
       reasons: recommendReasons,
     },
@@ -176,6 +190,8 @@ export function recommendFromMetrics(metrics: PlateMetrics, _model: Recommendati
       overrides: {
         layer_height: "0.20", outer_wall_speed: speed, inner_wall_speed: tall ? "180" : "210",
         top_shell_layers: "4", bottom_shell_layers: "3", support_threshold_angle: String(supportAngle),
+        support_top_z_distance: supportGap, support_bottom_z_distance: supportGap, support_interface_top_layers: "3",
+        overhang_1_4_speed: "0", overhang_2_4_speed: "50", overhang_3_4_speed: "35", overhang_4_4_speed: "15", overhang_totally_speed: "50",
       },
       reasons: speedReasons,
     },
