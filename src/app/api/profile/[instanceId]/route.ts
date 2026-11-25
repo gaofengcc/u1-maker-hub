@@ -4,7 +4,7 @@ import { readProject } from "@/lib/threemf.ts";
 import { errorResponse } from "@/lib/http.ts";
 import { resolveSite } from "@/lib/sites.ts";
 
-/** What the creator set in a print profile that the U1 settings would otherwise replace: for now, supports. */
+/** 返回作者意图量，supports 字段保持兼容。 */
 export async function GET(_req: NextRequest, ctx: RouteContext<"/api/profile/[instanceId]">) {
   const { instanceId } = await ctx.params;
   const id = Number(instanceId);
@@ -12,7 +12,7 @@ export async function GET(_req: NextRequest, ctx: RouteContext<"/api/profile/[in
   try {
     const { file } = await downloadInstance(id, resolveSite(_req.nextUrl.searchParams.get("site")));
     const project = await readProject(file);
-    return NextResponse.json({ supports: project.supports }, { headers: { "Cache-Control": "private, max-age=86400" } });
+    return NextResponse.json({ supports: project.supports, creator: project.creator, objectOverrides: project.objectOverrides }, { headers: { "Cache-Control": "private, max-age=86400" } });
   } catch (err) {
     return errorResponse(err);
   }

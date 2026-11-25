@@ -2,8 +2,27 @@ import fs from "node:fs";
 import JSZip from "jszip";
 import { NO_TRANSFORM, transformPlate, type PlateTransform } from "./geometry.ts";
 import { writeLayerHeights, type LayerLimits, type LayerPlan } from "./layerHeights.ts";
+import type { PrintOptions } from "./slicer.ts";
 
 /** What the app needs to know about a Bambu Studio / OrcaSlicer project file. */
+export type CreatorPreset = {
+  /** 作者在 3MF 中表达的模型意图量，速度、温度和加速度故意不包含在内。 */
+  options: Partial<PrintOptions>;
+  layerHeight: number | null;
+  wallLoops: number | null;
+  infillDensity: number | null;
+  infillPattern: string | null;
+  supportAngle: number | null;
+  brimType: string | null;
+  brimWidth: number | null;
+  materialTypes: string[];
+  materialColors: string[];
+  printer: string;
+  plateCount: number;
+  /** model_settings.config 中带对象级意图覆盖的对象数。 */
+  objectOverrides: number;
+};
+
 export type ProjectInfo = {
   application: string;
   printer: string;
@@ -11,6 +30,10 @@ export type ProjectInfo = {
   plates: { index: number; name: string }[];
   /** Supports as the creator set them: for the whole project, or on at least one object. */
   supports: "off" | "auto" | "plate";
+  /** 作者配置，读取失败或纯几何 3MF 时为 null。 */
+  creator: CreatorPreset | null;
+  /** 带 enable_support / wall_loops / sparse_infill_* 对象级覆盖的对象数量。 */
+  objectOverrides: number;
 };
 
 const PROJECT_SETTINGS = "Metadata/project_settings.config";
@@ -47,10 +70,46 @@ export async function readProject(file: string): Promise<ProjectInfo> {
     ? String(settings.support_on_build_plate_only ?? "0") === "1" ? "plate" : "auto"
     : objectSupports ? "auto" : "off";
 
+  const objectOverrides = countObjectOverrides(modelText);
+  const layerHeight = numberValue(settings.layer_height);
+  const wallLoops = numberValue(settings.wall_loops);
+  const infillDensity = percentValue(settings.sparse_infill_density);
+  const infillPattern = stringValue(settings.sparse_infill_pattern);
+  const supportAngle = numberValue(settings.support_threshold_angle);
+  const brimType = stringValue(settings.brim_type);
+  const brimWidth = numberValue(settings.brim_width);
+  const printer = String(settings.printer_settings_id ?? settings.printer_model ?? "");
+  const creator: CreatorPreset | null = settingsText ? {
+    options: {
+      ...(infillDensity != null ? { infillDensity } : {}),
+      ...(infillPattern && ["gyroid", "grid", "crosshatch", "cubic", "lightning", "honeycomb"].includes(infillPattern) ? { infillPattern: infillPattern as PrintOptions["infillPattern"] } : {}),
+      ...(wallLoops != null ? { wallLoops } : {}),
+      supports,
+      ...(brimType ? { brim: brimType === "no_brim" ? "none" : brimType === "outer_only" ? "always" : "auto" } : {}),
+      ironing: stringValue(settings.ironing_type) === "top",
+      ...(stringValue(settings.seam_position) && ["aligned", "back", "nearest", "random"].includes(stringValue(settings.seam_position)) ? { seam: stringValue(settings.seam_position) as PrintOptions["seam"] } : {}),
+      layers: "fixed",
+    },
+    layerHeight,
+    wallLoops,
+    infillDensity,
+    infillPattern,
+    supportAngle,
+    brimType,
+    brimWidth,
+    materialTypes: types,
+    materialColors: colors.map(normalizeColor),
+    printer,
+    plateCount: plates.length || 1,
+    objectOverrides,
+  } : null;
+
   return {
     application,
     supports,
-    printer: String(settings.printer_settings_id ?? settings.printer_model ?? ""),
+    creator,
+    objectOverrides,
+    printer,
     filaments: filaments.length ? filaments : [{ color: "#FFFFFF", type: "PLA", preset: "" }],
     plates: plates.length ? plates : [{ index: 1, name: "" }],
   };
@@ -133,4 +192,30 @@ function asArray(value: unknown): string[] {
 function normalizeColor(color: string) {
   const hex = color.trim().replace(/^#/, "");
   return `#${hex.slice(0, 6).toUpperCase().padEnd(6, "F")}`;
+}
+
+function firstValue(value: unknown): unknown {
+  return Array.isArray(value) ? value[0] : value;
+}
+
+function stringValue(value: unknown): string {
+  const v = firstValue(value);
+  return typeof v === "string" ? v.trim() : v == null ? "" : String(v);
+}
+
+function numberValue(value: unknown): number | null {
+  const n = Number(String(firstValue(value) ?? "").replace(/%$/, ""));
+  return Number.isFinite(n) ? n : null;
+}
+
+function percentValue(value: unknown): number | null {
+  return numberValue(value);
+}
+
+function countObjectOverrides(modelText: string): number {
+  let count = 0;
+  for (const block of modelText.match(/<object\b[\s\S]*?<\/object>/g) ?? []) {
+    if (/(?:key="(?:enable_support|wall_loops|sparse_infill_[^"]*)"\s+value=|key="(?:enable_support|wall_loops|sparse_infill_[^"]*)"\s+value=)/.test(block)) count++;
+  }
+  return count;
 }
