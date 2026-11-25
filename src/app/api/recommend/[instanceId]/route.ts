@@ -5,6 +5,7 @@ import { readProject } from "@/lib/threemf.ts";
 import { metricsFromTriangles, recommendFromMetrics, type Triangle } from "@/lib/recommend.ts";
 import { resolveSite } from "@/lib/sites.ts";
 import { extractHints } from "@/lib/modelHints.ts";
+import { mergeHints, parseHintsWithAI } from "@/lib/aiHints.ts";
 
 /** 返回当前盘几何指标和按模型形状计算的两套 U1 推荐参数。 */
 export async function GET(req: NextRequest, ctx: { params: Promise<{ instanceId: string }> }) {
@@ -20,7 +21,12 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ instanceId:
     for (const item of itemsOnPlate(project, plate)) eachTriangle(project, item, (triangle) => triangles.push(triangle.slice()));
     const metrics = metricsFromTriangles(triangles);
     const materialType = info.filaments[0]?.type ?? "PLA";
-    const hints = extractHints(design.summary ?? "");
+    // 正则层先给出确定性结果；AI 解析（命中缓存则零延迟）再补充语义理解。
+    // 任何失败都静默降级到正则，`?ai=0` 可强制只走正则。
+    const summary = design.summary ?? "";
+    const ruleHints = extractHints(summary);
+    const aiHints = req.nextUrl.searchParams.get("ai") === "0" ? null : await parseHintsWithAI(summary);
+    const { hints, source: hintsSource } = mergeHints(ruleHints, aiHints);
     const presets = recommendFromMetrics(metrics, { materialType, hints });
     const hintConflicts: string[] = [];
     if (hints.supports === "forbidden" && metrics.overhang45Percent >= 12) {
@@ -29,7 +35,7 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ instanceId:
     if (hints.supports === "required" && metrics.overhang45Percent < 12) {
       hintConflicts.push(`几何指标未建议开支撑（悬垂 ${metrics.overhang45Percent.toFixed(1)}%），但作者说明要求支撑 → 已按作者说明开启`);
     }
-    return NextResponse.json({ creator: info.creator, metrics, presets, hints, hintConflicts, plateCount: info.plates.length || 1, objectOverrides: info.objectOverrides });
+    return NextResponse.json({ creator: info.creator, metrics, presets, hints, hintsSource, hintConflicts, plateCount: info.plates.length || 1, objectOverrides: info.objectOverrides });
   } catch (err) {
     // 推荐面板可在下载失败时继续显示其它档位，故返回明确错误而不是 500。
     const message = err instanceof Error ? err.message : String(err);

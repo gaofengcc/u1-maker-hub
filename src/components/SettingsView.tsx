@@ -17,6 +17,10 @@ type PublicSettings = {
   haPlug: string;
   haTokenSet: boolean;
   tools: ToolLoad[];
+  aiEnabled: boolean;
+  aiBaseUrl: string;
+  aiModel: string;
+  aiKeySet: boolean;
 };
 
 type LoginStep = { status: "ok" } | { status: "code"; email: string } | { status: "tfa"; tfaKey: string };
@@ -28,6 +32,7 @@ export function SettingsView({ initial, filaments }: { initial: PublicSettings; 
       <h1 style={{ margin: 0, fontSize: 26 }}>{t("settings.title")}</h1>
       <AccountPanel s={s} onChange={setS} />
       <PrinterPanel s={s} onChange={setS} />
+      <AiPanel s={s} onChange={setS} />
       <PowerPanel s={s} onChange={setS} />
       <ToolsPanel s={s} onChange={setS} filaments={filaments} />
       <SessionPanel />
@@ -596,6 +601,94 @@ function ToolsPanel({ s, onChange, filaments }: { s: PublicSettings; onChange: (
         {saved && <span className="small" style={{ color: "var(--accent-ink)" }}>{t("settings.saved")}</span>}
         {syncMsg && <span className="small muted">{syncMsg}</span>}
       </div>
+    </section>
+  );
+}
+function AiPanel({ s, onChange }: { s: PublicSettings; onChange: (s: PublicSettings) => void }) {
+  const [enabled, setEnabled] = useState(s.aiEnabled);
+  const [baseUrl, setBaseUrl] = useState(s.aiBaseUrl);
+  const [model, setModel] = useState(s.aiModel);
+  const [key, setKey] = useState("");
+  const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  const save = async () => {
+    setBusy(true);
+    setMsg(null);
+    try {
+      const next = await api<PublicSettings>("/api/settings", {
+        method: "PUT",
+        body: JSON.stringify({ aiEnabled: enabled, aiBaseUrl: baseUrl, aiModel: model, ...(key.trim() ? { aiKey: key.trim() } : {}) }),
+      });
+      onChange(next);
+      setKey("");
+      setMsg({ ok: true, text: "已保存" });
+    } catch (err) {
+      setMsg({ ok: false, text: err instanceof Error ? err.message : String(err) });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const test = async () => {
+    setBusy(true);
+    setMsg(null);
+    try {
+      const r = await api<{ ok: boolean; latency?: number; model?: string; reply?: string; error?: string }>("/api/settings/ai", { method: "POST" });
+      setMsg(r.ok
+        ? { ok: true, text: `连接正常 · ${r.model ?? ""} · ${((r.latency ?? 0) / 1000).toFixed(1)} 秒 · 回复「${r.reply ?? ""}」` }
+        : { ok: false, text: r.error ?? "连接失败" });
+    } catch (err) {
+      setMsg({ ok: false, text: err instanceof Error ? err.message : String(err) });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <section className="panel">
+      <h2>AI 解析作者说明</h2>
+      <p className="small muted" style={{ lineHeight: 1.6 }}>
+        设计师常把层高、填充、支撑要求写在模型说明里，句式千变万化。开启后由大模型理解说明并提取这些提示，
+        自动覆盖按几何推算的参数；每段说明只解析一次并缓存，失败时自动回落到关键词规则。
+      </p>
+      <div className="field" style={{ marginBottom: 12 }}>
+        <span className="label">启用</span>
+        <div className="chips" role="group">
+          <button type="button" className="chip" aria-pressed={enabled} onClick={() => setEnabled(true)}>开启</button>
+          <button type="button" className="chip" aria-pressed={!enabled} onClick={() => setEnabled(false)}>关闭</button>
+        </div>
+      </div>
+      <div className="field" style={{ marginBottom: 12 }}>
+        <span className="label">接口地址</span>
+        <input className="input" value={baseUrl} onChange={(e) => setBaseUrl(e.target.value)} placeholder="https://api.deepseek.com/v1" />
+      </div>
+      <div className="field" style={{ marginBottom: 12 }}>
+        <span className="label">模型</span>
+        <input className="input" value={model} onChange={(e) => setModel(e.target.value)} placeholder="deepseek-v4-flash" />
+      </div>
+      <div className="field" style={{ marginBottom: 12 }}>
+        <span className="label">API Key</span>
+        <input
+          className="input"
+          type="password"
+          autoComplete="off"
+          value={key}
+          onChange={(e) => setKey(e.target.value)}
+          placeholder={s.aiKeySet ? "已设置（留空不修改）" : "粘贴 API key"}
+        />
+        <span className="small muted">只保存在本机 data/settings.json（权限 600），不会回传到页面。</span>
+      </div>
+      <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+        <button type="button" className="btn btn-primary" disabled={busy} onClick={save}>{busy ? "处理中…" : "保存"}</button>
+        <button type="button" className="btn" disabled={busy} onClick={test}>测试连接</button>
+        {s.aiKeySet && <button type="button" className="btn" disabled={busy} onClick={async () => {
+          const next = await api<PublicSettings>("/api/settings", { method: "PUT", body: JSON.stringify({ aiKey: null }) });
+          onChange(next);
+          setMsg({ ok: true, text: "已清除 API key" });
+        }}>清除 key</button>}
+      </div>
+      {msg && <p className="small" style={{ color: msg.ok ? "var(--ok, #2e7d32)" : "var(--err, #c62828)", marginTop: 10 }}>{msg.text}</p>}
     </section>
   );
 }

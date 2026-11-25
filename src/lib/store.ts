@@ -25,6 +25,13 @@ export type Settings = {
   haToken?: string;
   haPlug?: string;
   tools: ToolLoad[];
+  /** 大模型解析作者说明用的接口配置；apiKey 只存在于 data/settings.json（不入库）。 */
+  ai?: {
+    enabled?: boolean;
+    baseUrl?: string;
+    model?: string;
+    apiKey?: string;
+  };
 };
 
 const DEFAULT_SETTINGS: Settings = {
@@ -103,6 +110,11 @@ export function publicSettings() {
     haPlug: s.haPlug ?? "",
     haTokenSet: Boolean(s.haToken),
     tools: s.tools,
+    // AI 配置只回传"是否已设置 key"，绝不把 key 发到浏览器。
+    aiEnabled: s.ai?.enabled !== false,
+    aiBaseUrl: s.ai?.baseUrl ?? process.env.AI_BASE_URL ?? "https://api.deepseek.com/v1",
+    aiModel: s.ai?.model ?? process.env.AI_MODEL ?? "deepseek-v4-flash",
+    aiKeySet: Boolean(s.ai?.apiKey || process.env.DEEPSEEK_API_KEY || process.env.AI_API_KEY),
   };
 }
 

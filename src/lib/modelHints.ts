@@ -7,6 +7,8 @@ export type ModelHints = {
   brim?: "required" | "forbidden";
   quotes: { label: string; sentence: string }[];
   text: string;
+  /** 解析来源：rule=正则规则，ai=大模型（带引用校验）。 */
+  source?: "rule" | "ai";
 };
 
 /**
@@ -37,7 +39,7 @@ function decodeEntities(value: string): string {
 }
 
 /** HTML 转纯文本，同时为说明中的段落和列表保留句子边界。 */
-function htmlToText(summaryHtml: string): string {
+export function htmlToText(summaryHtml: string): string {
   const source = String(summaryHtml ?? "");
   const withBreaks = source
     .replace(/<br\s*\/?>/gi, "\n")

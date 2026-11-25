@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { publicSettings, writeSettings } from "@/lib/store.ts";
+import { publicSettings, readSettings, writeSettings } from "@/lib/store.ts";
 import { readJson } from "@/lib/http.ts";
 import type { ToolLoad } from "@/lib/slicer.ts";
 import { DEFAULT_PRICE_PER_KG } from "@/lib/format.ts";
@@ -15,7 +15,10 @@ export async function GET() {
  * The Bambu token is managed by /api/auth/token. An empty Home Assistant token keeps the saved one; null removes it.
  */
 export async function PUT(req: Request) {
-  const body = await readJson<{ printerHost?: string; tools?: ToolLoad[]; haUrl?: string; haToken?: string | null; haPlug?: string; site?: string }>(req);
+  const body = await readJson<{
+    printerHost?: string; tools?: ToolLoad[]; haUrl?: string; haToken?: string | null; haPlug?: string; site?: string;
+    aiEnabled?: boolean; aiBaseUrl?: string; aiModel?: string; aiKey?: string | null;
+  }>(req);
   const patch: Parameters<typeof writeSettings>[0] = { site: resolveSite(body.site) };
   if (typeof body.printerHost === "string") {
     const host = body.printerHost.trim();
@@ -40,6 +43,23 @@ export async function PUT(req: Request) {
   }
   if (body.haToken === null) patch.haToken = undefined;
   else if (typeof body.haToken === "string" && body.haToken.trim()) patch.haToken = body.haToken.trim();
+  // AI 接口：key 留空=保持原值，null=清除；只存 data/settings.json（0o600，且该目录不入库）。
+  if (typeof body.aiEnabled === "boolean" || typeof body.aiBaseUrl === "string" || typeof body.aiModel === "string" || body.aiKey !== undefined) {
+    const saved = readSettings().ai ?? {};
+    const nextAi = { ...saved };
+    if (typeof body.aiEnabled === "boolean") nextAi.enabled = body.aiEnabled;
+    if (typeof body.aiBaseUrl === "string") {
+      const url = body.aiBaseUrl.trim().replace(/\/+$/, "");
+      if (url && !/^https?:\/\/[\w.-]+(:\d+)?(\/[\w./-]*)?$/.test(url)) {
+        return NextResponse.json({ error: "接口地址要像 https://api.deepseek.com/v1" }, { status: 400 });
+      }
+      nextAi.baseUrl = url || undefined;
+    }
+    if (typeof body.aiModel === "string") nextAi.model = body.aiModel.trim() || undefined;
+    if (body.aiKey === null) nextAi.apiKey = undefined;
+    else if (typeof body.aiKey === "string" && body.aiKey.trim()) nextAi.apiKey = body.aiKey.trim();
+    patch.ai = nextAi;
+  }
   if (Array.isArray(body.tools) && body.tools.length === 4) {
     patch.tools = body.tools.map((t) => {
       const price = Number(t.pricePerKg);
