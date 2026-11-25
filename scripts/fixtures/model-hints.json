@@ -1,0 +1,48 @@
+{
+  "_note": "真实 MakerWorld 说明原文（公开内容）。用于校准作者提示解析，勿针对单条打补丁。",
+  "2303103": {
+    "source": "全能 3D 极限测试",
+    "html": "<h2>🚀 <strong>全能 3D 极限测试 - 极限校准</strong> 🚀</h2><p>您是否更换了耗材或刚为您的打印机安装了升级件？这个模型是诊断您机器健康状况的终极工具，它在一个紧凑的部件中即可完成。旨在节省材料，同时测试您设置的<strong>每个极限</strong>。</p><h3>🔍 <strong>我们到底在测试什么？</strong></h3><ul><li><strong>📐 悬垂角度 (Overhangs)：</strong> 标记有<strong>15°、20°、30° 和 45°</strong>。测试您的层冷却系统，看看在出现&#34;混乱&#34;之前，您可以在没有支撑的情况下打印到什么程度。</li><li><strong>🕸️ 回抽测试 (Stringing)：</strong> 顶部的<strong>6 根超细针</strong>会立即检测出您是否有拉丝或&#34;天使毛发&#34;。如果它们干净利落，那您的回抽就完美了！</li><li><strong>📏 直径公差：</strong> 5 个间隙为<strong>0.2mm 到 0.6mm</strong> 的圆柱体。理想地用于了解您的机械零件是否能一次性吻合，或者您是否需要调整流量比例 (Flow Rate)。</li><li><strong>🌉 桥接 (Bridging)：</strong> 在侧面，您会发现一系列水平开口，用于检查您的切片软件如何处理空中的长线而不会掉落。</li><li><strong>🏔️ 垂直分辨率和 Z 轴步进：</strong> 中央阶梯金字塔有助于可视化层质量和 Z 轴精度。</li><li><strong>🔢 文本清晰度：</strong> 刻印和浮雕的数字会告诉您挤出定义得有多好，以及是否存在&#34;重影&#34;或振动。</li><li><strong>📏 精准标尺：</strong> 底座上的标记用于验证设计中的 1cm 在现实中是否确实是 1cm。</li></ul><h3>⚙️ <strong>推荐设置</strong></h3><ul><li><strong>层高：</strong> 0.16mm 或 0.20mm（以获得最大保真度）。</li><li><strong>填充 (Infill)：</strong> 10-15%（足以进行此测试）。</li><li><strong>支撑：</strong> 🚫 <strong>禁止！</strong> 目的是测试打印机的极限。</li><li><strong>材料：</strong> 适用于 PLA、PETG 或 ABS。</li></ul><p><strong>💬 分享您的结果！</strong> 上传您打印的图片，并告诉我们您使用了哪种打印机和设置。帮助其他创客找到完美的设置！🌟</p>",
+    "expect": {
+      "supports": "forbidden",
+      "layerMin": 0.16,
+      "layerMax": 0.2,
+      "infillMin": 10,
+      "infillMax": 15,
+      "material": "PLA"
+    }
+  },
+  "1206986": {
+    "source": "星夜·文森特·梵高",
+    "html": "星夜·文森特·梵高\n为我助力请为我助力 :p:d项目：van gogh.hfp\n以0.08mm的层高，100%的填充率进行打印，底层高度为0.16mm\n模型尺寸为140.88x245mm\n您可以在低于0.48mm最小深度的条件下使用更高的层高进行打印\n最大深度为2.5mm，实际深度为2.6mm\n \n所用耗材：\n   PLA Sulnu黑色，透光率：0.3\n   PLA Sunlu + 绿色，透光率：3\n   PLA eSun蓝色，透光率：2\n   Bambu Lab哑光冰蓝色，透光率：3.5\n   PLA Sunlu红色，透光率：2\n   PLA eSun黄色，透光率：4.9\n   PLA Sunlu哑光白色，透光率：5\n\n此打印使用了7种独特的耗材\n \n更换说明：\n   从黑色开始\n   在第8层（0.72mm）切换到绿色\n   在第9层（0.8mm）切换到蓝色\n   在第11层（0.96mm）切换到冰蓝色\n   在第14层（1.2mm）切换到绿色\n   在第19层（1.6mm）切换到红色\n   在第20层（1.68mm）切换到黄色\n   在第24层（2mm）切换到白色，直到打印结束。\n \n如果您喜欢我的Hueforge作品，请留下评论和点赞。非常感谢您。\n非商业用途！！！\n \n",
+    "expect": {
+      "layerMin": 0.08,
+      "layerMax": 0.08,
+      "infillMin": 100,
+      "infillMax": 100
+    }
+  },
+  "1257123": {
+    "source": "手动进退料接头",
+    "html": "手动换料配件，无需打开干燥箱即可实现换料，只需旋开接头，手动进送料，结束后再旋紧接头即可。\n接头不分公母，如有损坏只需重打一个。\n接头不需要五金件，只需要将铁氟龙管切断一小节将接头接入即可。\n省料，两组4个100%填充只需要11g料。\n \n",
+    "expect": {
+      "noHints": true
+    }
+  },
+  "2401531": {
+    "source": "耗材进料器塔",
+    "html": "Snapmaker U1 耗材进料器塔，可将其移近耗材干燥机。\n \n我设计它旨在将进料器放在Creality SpacePi X4干燥机正后方。该塔是倾斜的，因此连接PTFE管的进料器占地面积更小。\n我不想用螺丝将塔固定在我的桌面上，所以这个模型设计用于IKEA STUGVIK挂钩的吸盘。\n \n宜家吸盘是带螺纹的，直径54毫米。\n \n该模型的Onshape源：https://cad.onshape.com/documents/e7e56b8812700a7e1f3e8e8b/w/1b4a401b77dc6f9254c7ee10/e/4c75761b0191f3b20b4682bf\n \n该模型的源文件还包括Snorca的打印配置。此打印配置适用于PLA和PETG支撑，以获得清晰的底部表面光洁度。\n \n",
+    "expect": {
+      "noSupports": true,
+      "material": "PLA"
+    }
+  },
+  "2619982": {
+    "source": "后右侧进料器安装座",
+    "html": "支持将两个进料器都放在右后方。不干扰USB端口或任何其他设备，也可以在前部使用PTFE管线的适配器。\nPTFE管线需要缩短（尤其是3号和4号）。为避免接头断裂，零件必须按照片所示方向放置，使用宽裙边（例如8毫米），以及细树状支撑。最合适的材料是PTEG，以获得正确的阻力和弹性。\n（右侧进料器也需要一根短延长线）\n",
+    "expect": {
+      "supports": "required",
+      "brim": "required"
+    }
+  }
+}

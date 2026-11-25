@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { metricsFromTriangles, recommendFromMetrics } from "../src/lib/recommend.ts";
 import { extractHints } from "../src/lib/modelHints.ts";
 import { optionsToOverrides, DEFAULT_OPTIONS, type PrintOptions } from "../src/lib/slicer.ts";
@@ -113,6 +114,29 @@ if (rangedRec.recommend.overrides.layer_height !== "0.16") throw new Error("推�
 if (rangedRec.speed.overrides.layer_height !== "0.20") throw new Error("最快档层高应保持0.20");
 if (rangedRec.recommend.options.infillDensity !== 15) throw new Error("推荐档填充未夹到15");
 if (rangedRec.speed.options.infillDensity !== 12) throw new Error("最快档填充应保持区间内12");
+// ---- 真实语料回归（scripts/fixtures/model-hints.json，原文照抄公开说明）----
+// 这 5 条是线上真实模型的说明，覆盖过 5 类误判：材料语境、用量语境、无祈使前缀、
+// 数字被邻近参数抢走（0.16 底层高度 / 0.48 最小深度）。
+const fixtures = JSON.parse(
+  readFileSync(new URL("./fixtures/model-hints.json", import.meta.url), "utf8"),
+) as Record<string, any>;
+let fixtureCount = 0;
+for (const [id, fx] of Object.entries(fixtures)) {
+  if (id.startsWith("_")) continue;
+  const h = extractHints(fx.html);
+  const e = fx.expect ?? {};
+  if (e.supports && h.supports !== e.supports) throw new Error(`${id} supports 应为 ${e.supports}，实际 ${h.supports}`);
+  if (e.noSupports && h.supports !== undefined) throw new Error(`${id} 不应判定支撑，实际 ${h.supports}`);
+  if (e.brim && h.brim !== e.brim) throw new Error(`${id} brim 应为 ${e.brim}，实际 ${h.brim}`);
+  if (e.noHints && h.quotes.length > 0) throw new Error(`${id} 不应有任何提示，实际 ${h.quotes.length} 条`);
+  if (e.layerMin !== undefined && h.layerHeight?.min !== e.layerMin) throw new Error(`${id} 层高下限应为 ${e.layerMin}，实际 ${h.layerHeight?.min}`);
+  if (e.layerMax !== undefined && h.layerHeight?.max !== e.layerMax) throw new Error(`${id} 层高上限应为 ${e.layerMax}，实际 ${h.layerHeight?.max}`);
+  if (e.infillMin !== undefined && h.infill?.min !== e.infillMin) throw new Error(`${id} 填充下限应为 ${e.infillMin}，实际 ${h.infill?.min}`);
+  if (e.infillMax !== undefined && h.infill?.max !== e.infillMax) throw new Error(`${id} 填充上限应为 ${e.infillMax}，实际 ${h.infill?.max}`);
+  if (e.material && !(h.materials ?? []).includes(e.material)) throw new Error(`${id} 应识别材料 ${e.material}`);
+  fixtureCount++;
+}
+console.log(`真实语料回归 ${fixtureCount} 条全过`);
 console.log("verify-recommend: PASS");
 console.log(`cube volume=${box.volumeMm3} surface=${box.surfaceAreaMm2} overhang45=${box.overhang45Percent}% bed=${box.bedContactAreaMm2}`);
 console.log(`slope45 overhang45=${slope.overhang45Percent.toFixed(2)}% area=${slope.surfaceAreaMm2.toFixed(2)}`);
