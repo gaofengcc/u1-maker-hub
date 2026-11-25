@@ -152,16 +152,15 @@ export function optionsToOverrides(o: PrintOptions): Record<string, string> {
     ...(o.overhangSpeed !== undefined && o.overhangSpeed !== "auto"
       ? (() => {
           const speeds = {
-            standard: [0, 50, 35, 15, 50],
-            slow: [0, 40, 25, 10, 40],
-            off: [0, 50, 30, 10, 50],
+            standard: [0, 50, 35, 15],
+            slow: [0, 40, 25, 10],
+            off: [0, 50, 30, 10],
           }[o.overhangSpeed];
           return {
             overhang_1_4_speed: String(speeds[0]),
             overhang_2_4_speed: String(speeds[1]),
             overhang_3_4_speed: String(speeds[2]),
             overhang_4_4_speed: String(speeds[3]),
-            overhang_totally_speed: String(speeds[4]),
           };
         })()
       : {}),

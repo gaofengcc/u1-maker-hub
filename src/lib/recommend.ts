@@ -10,6 +10,8 @@ export type PlateMetrics = {
   surfaceAreaMm2: number;
   overhang45Percent: number;
   overhang60Percent: number;
+  /** 中腰水平朝下面（大平悬空/顶棚）的面积：这类面不靠降速、要靠桥接速度与支撑。 */
+  flatOverhangMm2: number;
   bedContactAreaMm2: number;
   heightMm: number;
   baseAreaMm2: number;
@@ -63,7 +65,7 @@ export function metricsFromTriangles(triangles: Iterable<Triangle>): PlateMetric
   if (!triangleCount) {
     return {
       bbox: [0, 0, 0, 0, 0, 0], volumeMm3: 0, surfaceAreaMm2: 0,
-      overhang45Percent: 0, overhang60Percent: 0, bedContactAreaMm2: 0,
+      overhang45Percent: 0, overhang60Percent: 0, flatOverhangMm2: 0, bedContactAreaMm2: 0,
       heightMm: 0, baseAreaMm2: 0, heightToBaseRatio: 0, thinFeatureScore: 0, triangleCount: 0,
     };
   }
@@ -72,6 +74,7 @@ export function metricsFromTriangles(triangles: Iterable<Triangle>): PlateMetric
   const tolerance = Math.max(0.05, heightMm * 0.001);
   let over45 = 0;
   let over60 = 0;
+  let flatOverhangMm2 = 0;
   let bedContactAreaMm2 = 0;
   for (const row of rows) {
     const p = row.points;
@@ -80,6 +83,8 @@ export function metricsFromTriangles(triangles: Iterable<Triangle>): PlateMetric
     if (row.nz < 0 && atBed) {
       bedContactAreaMm2 += row.area;
     }
+    // 中腰近水平朝下面 = 大平悬空（顶棚 / 桥面），Orca 对这类面只认 bridge_speed。
+    if (row.nz < -0.9 && !atBed) flatOverhangMm2 += row.area;
     // 水平朝下面只有位于最低处才是贴床面，中腰的水平顶棚仍需支撑。
     const horizontalDown = row.nz < -0.999 && Math.abs(p[2] - p[5]) < 1e-6 && Math.abs(p[2] - p[8]) < 1e-6 && atBed;
     // 45° 边界面按“不计入”处理，留出微小数值误差容差。
@@ -102,6 +107,7 @@ export function metricsFromTriangles(triangles: Iterable<Triangle>): PlateMetric
     surfaceAreaMm2: area,
     overhang45Percent: area ? (over45 / area) * 100 : 0,
     overhang60Percent: area ? (over60 / area) * 100 : 0,
+    flatOverhangMm2,
     bedContactAreaMm2,
     heightMm,
     baseAreaMm2,
@@ -139,22 +145,32 @@ export function recommendFromMetrics(metrics: PlateMetrics, model: Recommendatio
   const speedWalls = tall ? 2 : 3;
   const speed = tall ? "150" : "190";
   const baseText = `贴床面 ${metrics.bedContactAreaMm2.toFixed(1)} mm²且高度 ${metrics.heightMm.toFixed(1)} mm`;
-  const overhangReason = `悬垂 ${overhang.toFixed(1)}%（>45°）、严重悬垂 ${severeOverhang.toFixed(1)}%（>60°）→ 支撑角 ${supportAngle}°（宁可多支撑，防塌陷）`;
-  const supportSummary = needsSupport ? `开启树状支撑，${overhangReason}` : `不开启支撑，${overhangReason}`;
+  // 大平悬空（顶棚/桥面）只认 bridge_speed，实测 Orca 对这类面不套用悬垂分段降速。
+  const flatRoof = metrics.flatOverhangMm2;
+  const bridgeSpeed = flatRoof >= 300 ? "35" : null;
+  const overhangReason = needsSupport
+    ? `悬垂 ${overhang.toFixed(1)}%（>45°）、严重悬垂 ${severeOverhang.toFixed(1)}%（>60°）→ 开树状支撑，支撑角 ${supportAngle}°（宁可多支撑，防塌陷）`
+    : `悬垂 ${overhang.toFixed(1)}%（>45°）、严重悬垂 ${severeOverhang.toFixed(1)}%（>60°）、未达 12% → 不建支撑，只靠悬垂段降速`;
+  const speedPair = "40/25/10";
+  const flatReason = flatRoof >= 1
+    ? `平悬空 ${flatRoof.toFixed(0)} mm²（中腰水平朝下）${bridgeSpeed ? `→ 桥接速度降到 ${bridgeSpeed} mm/s（实测代价约 +7%）` : "（面积小，桥接速度保持默认）"}`
+    : null;
 
   const recommendReasons = [
     `层高 0.12 mm、墙数 ${wallLoops} 圈、填充 18%（gyroid），兼顾细节与强度`,
     `${baseText}，高/底宽比 ${metrics.heightToBaseRatio.toFixed(2)} → ${brim === "always" ? "加 5 mm brim" : "使用自动 brim"}`,
-    `悬垂专项：${supportSummary}`,
+    `悬垂专项：${overhangReason}；悬垂段降速 ${speedPair} mm/s`,
   ];
+  if (flatReason) recommendReasons.push(`悬垂专项：${flatReason}`);
   if (tall) recommendReasons.push(`细高件高度 ${metrics.heightMm.toFixed(1)} mm、高/底宽比 ${metrics.heightToBaseRatio.toFixed(2)} → 外壁速度降至 ${speed} mm/s`);
 
   const speedReasons = [
     `层高 0.20 mm、墙数 ${speedWalls} 圈、填充 12%（gyroid），预计比精细档更快`,
     `外壁速度 ${speed} mm/s，保留表面稳定性并避免极限速度波纹`,
     `${baseText}，高/底宽比 ${metrics.heightToBaseRatio.toFixed(2)} → ${brim === "always" ? "加 5 mm brim" : "使用自动 brim"}`,
-    `悬垂专项：${supportSummary}`,
+    `悬垂专项：${overhangReason}；悬垂段降速 50/35/15 mm/s`,
   ];
+  if (flatReason) speedReasons.push(`悬垂专项：${flatReason}`);
   if (overhang >= 30) speedReasons.push(`悬垂 ${overhang.toFixed(1)}%（>45°）→ 建议改朝向`);
 
   const commonOverrides = {
@@ -166,7 +182,8 @@ export function recommendFromMetrics(metrics: PlateMetrics, model: Recommendatio
     overhang_2_4_speed: "40",
     overhang_3_4_speed: "25",
     overhang_4_4_speed: "10",
-    overhang_totally_speed: "40",
+    // overhang_totally_speed 是 Snapmaker 分支私有键，上游 OrcaSlicer 2.4.2 会直接丢弃，
+    // 写了也不进 gcode 的 CONFIG 块（实测），故不下发。
   };
   return {
     recommend: {
@@ -177,7 +194,8 @@ export function recommendFromMetrics(metrics: PlateMetrics, model: Recommendatio
       },
       overrides: {
         layer_height: "0.12", outer_wall_speed: tall ? "150" : "180", top_shell_layers: "5", bottom_shell_layers: "4",
-        ...commonOverrides, seam_slope_type: "external", seam_slope_conditional: "1",
+        ...commonOverrides, ...(bridgeSpeed ? { bridge_speed: "35" } : {}),
+        seam_slope_type: "external", seam_slope_conditional: "1",
       },
       reasons: recommendReasons,
     },
@@ -191,7 +209,8 @@ export function recommendFromMetrics(metrics: PlateMetrics, model: Recommendatio
         layer_height: "0.20", outer_wall_speed: speed, inner_wall_speed: tall ? "180" : "210",
         top_shell_layers: "4", bottom_shell_layers: "3", support_threshold_angle: String(supportAngle),
         support_top_z_distance: supportGap, support_bottom_z_distance: supportGap, support_interface_top_layers: "3",
-        overhang_1_4_speed: "0", overhang_2_4_speed: "50", overhang_3_4_speed: "35", overhang_4_4_speed: "15", overhang_totally_speed: "50",
+        overhang_1_4_speed: "0", overhang_2_4_speed: "50", overhang_3_4_speed: "35", overhang_4_4_speed: "15",
+        ...(bridgeSpeed ? { bridge_speed: "40" } : {}),
       },
       reasons: speedReasons,
     },

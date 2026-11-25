@@ -12,7 +12,7 @@ function cube(size: number): Triangle[] {
 function metricWithOverhang(overhang45Percent: number, overhang60Percent = 0): Parameters<typeof recommendFromMetrics>[0] {
   return {
     bbox: [0, 0, 0, 20, 20, 20], volumeMm3: 8000, surfaceAreaMm2: 2400,
-    overhang45Percent, overhang60Percent, bedContactAreaMm2: 400, heightMm: 20,
+    overhang45Percent, overhang60Percent, flatOverhangMm2: 0, bedContactAreaMm2: 400, heightMm: 20,
     baseAreaMm2: 400, heightToBaseRatio: 1, thinFeatureScore: 0, triangleCount: 12,
   };
 }
@@ -27,7 +27,14 @@ if (recommendFromMetrics(metricWithOverhang(5), { materialType: "PETG" }).recomm
 if (recommendFromMetrics(metricWithOverhang(5), { materialType: "PLA" }).recommend.overrides.support_top_z_distance !== "0.2") throw new Error("PLA支撑间隙应为0.2");
 const baseOptions: PrintOptions = { ...DEFAULT_OPTIONS, supports: "off" };
 const slowOverrides = optionsToOverrides({ ...baseOptions, overhangSpeed: "slow" });
-if (slowOverrides.overhang_2_4_speed !== "40" || slowOverrides.overhang_3_4_speed !== "25" || slowOverrides.overhang_4_4_speed !== "10" || slowOverrides.overhang_totally_speed !== "40") throw new Error("slow悬垂降速映射错误");
+if (slowOverrides.overhang_2_4_speed !== "40" || slowOverrides.overhang_3_4_speed !== "25" || slowOverrides.overhang_4_4_speed !== "10") throw new Error("slow悬垂降速映射错误");
+if ("overhang_totally_speed" in slowOverrides) throw new Error("overhang_totally_speed 是 Snapmaker 私有键，上游切片器会丢弃，不应下发");
+// 大平悬空 → 桥接降速；小面积 → 不下发
+const roofMetrics = metricWithOverhang(20);
+roofMetrics.flatOverhangMm2 = 3300;
+const roofRec = recommendFromMetrics(roofMetrics);
+if (roofRec.recommend.overrides.bridge_speed !== "35") throw new Error("大平悬空应把桥接速度降到 35");
+if (recommendFromMetrics(metricWithOverhang(20)).recommend.overrides.bridge_speed !== undefined) throw new Error("平悬空小时不应改桥接速度");
 const autoOverrides = optionsToOverrides({ ...baseOptions, overhangSpeed: "auto" });
 if (Object.keys(autoOverrides).some((key) => key.startsWith("overhang_"))) throw new Error("auto不应覆盖悬垂降速");
 
