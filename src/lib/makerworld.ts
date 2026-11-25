@@ -16,7 +16,7 @@ export class MakerWorldError extends Error {
   constructor(
     message: string,
     public status: number,
-    public code: "login_required" | "token_expired" | "captcha" | "rate_limited" | "not_found" | "upstream" = "upstream",
+    public code: "login_required" | "token_expired" | "captcha" | "rate_limited" | "not_found" | "no_profile" | "upstream" = "upstream",
   ) {
     super(message);
   }
@@ -356,7 +356,16 @@ export async function downloadInstance(instanceId: number, site?: SiteId): Promi
     return { file, name: meta.name, cached: true };
   }
   const token = requireToken(selectedSite);
-  const link = await call<{ name?: string; url?: string }>(`/v1/design-service/instance/${instanceId}/f3mf?type=download`, { token }, selectedSite);
+  // 设计 id 与配置 id 是两套编号：拿设计 id 调实例接口会被回「客户端没有访问内容的权限」。
+  // 这种情况解析出该设计的默认配置再试一次（真实案例：2980076 → 3571453）。
+  let link: { name?: string; url?: string } | null = null;
+  try {
+    link = await call<{ name?: string; url?: string }>(`/v1/design-service/instance/${instanceId}/f3mf?type=download`, { token }, selectedSite);
+  } catch (err) {
+    const target = await resolveDownloadTarget(instanceId, selectedSite);
+    if (target.instanceId === instanceId) throw err;
+    link = await call<{ name?: string; url?: string }>(`/v1/design-service/instance/${target.instanceId}/f3mf?type=download`, { token }, selectedSite);
+  }
   if (!link.url) throw new MakerWorldError("MakerWorld returned no download link for this profile.", 502);
   // The signed CDN URL expires within minutes and must be fetched byte-exact, without auth.
   const res = await fetch(link.url, { headers: { "User-Agent": UA, "Accept-Language": siteConfig(selectedSite).acceptLanguage } });
@@ -431,4 +440,25 @@ export async function saveToken(rawToken: string, refreshToken?: string, site?: 
 
 export function logout(site?: SiteId) {
   clearAccount(resolveSite(site));
+}
+/**
+ * 把「设计 id」解析成「配置 id」。说明：
+ * - MakerWorld 的设计 id 与配置（instance）id 是两套编号，下载 3MF 必须用配置 id；
+ * - 拿设计 id 去调实例接口，服务端回的是「客户端没有访问内容的权限」，很容易被误判成许可限制；
+ * - 如果这个 id 本身没有配置（只有 STL 等其它格式），明确报 no_profile。
+ */
+export async function resolveDownloadTarget(id: number, site?: SiteId): Promise<{ instanceId: number; instanceCount: number }> {
+  const selectedSite = resolveSite(site);
+  let design: RawDesign | null = null;
+  try {
+    design = await call<RawDesign>(`/v1/design-service/design/${id}`, {}, selectedSite);
+  } catch {
+    return { instanceId: id, instanceCount: 1 };
+  }
+  const instances = design?.instances ?? [];
+  if (!instances.length) {
+    throw new MakerWorldError("这个模型没有 3MF 打印配置（作者只上传了其它格式），无法切片。", 404, "no_profile");
+  }
+  const preferred = instances.find((i) => i.isDefault || i.id === design?.defaultInstanceId) ?? instances[0];
+  return { instanceId: Number(preferred.id), instanceCount: instances.length };
 }
