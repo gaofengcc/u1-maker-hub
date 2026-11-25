@@ -33,7 +33,7 @@ export async function POST(req: NextRequest) {
   const plate = Math.max(0, Math.round(Number(body.plate ?? 1)) || 0);
   const mode = body.mode as PrintMode;
   if (!Number.isInteger(instanceId) || instanceId <= 0) return NextResponse.json({ error: "模型编号无效。" }, { status: 400 });
-  if (!(mode in PRINT_MODES)) return NextResponse.json({ error: "切片档位无效。" }, { status: 400 });
+  if (typeof mode !== "string" || !(mode in PRINT_MODES)) return NextResponse.json({ error: "切片档位无效。" }, { status: 400 });
   const options = normalizeOptions(body.options);
   try {
     const site = resolveSite(body.site ?? req.nextUrl.searchParams.get("site"));
