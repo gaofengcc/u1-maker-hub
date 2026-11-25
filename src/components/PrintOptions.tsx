@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import type { PrintOptions as Options } from "@/lib/slicer.ts";
+import { PRINT_MODES, type PrintOptions as Options } from "@/lib/slicer.ts";
 import { t } from "@/lib/i18n";
 import { api, duration } from "@/lib/format";
 
@@ -47,17 +47,19 @@ type MetricsLike = {
   baseAreaMm2?: number;
 };
 
-function roughEstimate(metrics: MetricsLike | null | undefined, options: Options): EstimateValue | null {
+function roughEstimate(metrics: MetricsLike | null | undefined, options: Options, layerHeight = 0.2): EstimateValue | null {
   const volume = Number(metrics?.volumeMm3 ?? metrics?.volume);
   const surface = Number(metrics?.surfaceAreaMm2 ?? metrics?.surfaceArea);
   const height = Number(metrics?.heightMm ?? metrics?.height);
   if (!(volume > 0) || !(surface > 0) || !(height > 0)) return null;
   // 粗估公式：耗材体积 ≈ 表面积×墙圈数×挤出宽度(0.42)×0.7 + 体积×填充密度。
-  // 重量按 PLA 1.24 g/cm³，时间由体积、层数和约 1.5 秒/层推算。主要误差来自支撑体积、多色换料、加速度限制、小特征减速。
+  // VM200 / U1 / PLA / 20mm 立方体实测的端到端等效流量，包含空驶与加减速。
   const materialVolume = surface * options.wallLoops * 0.42 * 0.7 + volume * Math.max(0, options.infillDensity) / 100;
   const grams = (materialVolume / 1000) * 1.24;
-  const layers = Math.max(1, Math.ceil(height / (options.layers === "adaptive" ? 0.16 : options.layers === "balanced" ? 0.2 : 0.2)));
-  const seconds = Math.round(volume / 18 + layers * 1.5 + (options.supports === "off" ? 0 : 45));
+  const h = Number.isFinite(layerHeight) && layerHeight > 0 ? layerHeight : 0.2;
+  const flowAt = h <= 0.12 ? 2.75 : h >= 0.28 ? 4.1 : h <= 0.2 ? 2.75 + (3.46 - 2.75) * (h - 0.12) / 0.08 : 3.46 + (4.1 - 3.46) * (h - 0.2) / 0.08;
+  let seconds = materialVolume / flowAt + (options.supports === "off" ? 0 : 45);
+  if (options.ironing) seconds *= 1.25;
   return { seconds, grams };
 }
 
@@ -328,10 +330,10 @@ export function PrintOptionsPanel(props: PrintOptionsPanelProps) {
   const recOptions = useMemo(() => presetOptions(defaults, recommend), [defaults, recommend]);
   const speedOptions = useMemo(() => presetOptions(defaults, speed), [defaults, speed]);
   const rough: Record<string, EstimateValue | null> = {
-    recommend: recommend?.estimate ?? roughEstimate(metrics, recOptions),
-    speed: speed?.estimate ?? roughEstimate(metrics, speedOptions),
-    model: roughEstimate(metrics, { ...defaults, ...(creatorPreset?.options ?? modelPreset?.options ?? {}) }),
-    custom: roughEstimate(metrics, value),
+    recommend: recommend?.estimate ?? roughEstimate(metrics, recOptions, PRINT_MODES.fine.layerHeight),
+    speed: speed?.estimate ?? roughEstimate(metrics, speedOptions, PRINT_MODES.fast.layerHeight),
+    model: roughEstimate(metrics, { ...defaults, ...(creatorPreset?.options ?? modelPreset?.options ?? {}) }, creatorPreset?.layerHeight ?? modelPreset?.layerHeight ?? PRINT_MODES.standard.layerHeight),
+    custom: roughEstimate(metrics, value, PRINT_MODES.standard.layerHeight),
   };
 
   const apply = (next: Options) => onChange(next);
