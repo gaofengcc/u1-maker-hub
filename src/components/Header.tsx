@@ -3,10 +3,11 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
-import { CubeIcon, GearIcon, HeartIcon, PlateIcon, PrinterIcon, SearchIcon, UploadIcon } from "./Icons";
+import { CubeIcon, GearIcon, HeartIcon, PlateIcon, PrinterIcon, PrintsIcon, SearchIcon, UploadIcon } from "./Icons";
 import { useFavorites } from "@/lib/useFavorites";
 import { usePlate } from "@/lib/usePlate";
 import { SITES, type SiteId } from "@/lib/sites";
+import { t } from "@/lib/i18n";
 
 type MiniStatus = { configured?: boolean; online: boolean; state?: string; progress?: number; error?: string };
 
@@ -16,6 +17,7 @@ const LINKS = [
   { href: "/plate", label: "打印盘", short: "盘", Icon: PlateIcon },
   { href: "/upload", label: "上传模型", short: "上传", Icon: UploadIcon },
   { href: "/printer", label: "我的打印机", short: "打印机", Icon: PrinterIcon },
+  { href: "/history", label: t("header.history"), short: t("header.history"), Icon: PrintsIcon },
   { href: "/settings", label: "设置", short: "设置", Icon: GearIcon },
 ];
 
