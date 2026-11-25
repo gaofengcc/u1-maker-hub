@@ -34,6 +34,44 @@ const RELIABILITY_PROCESS: Record<string, string> = {
   support_interface_top_layers: "3",
 };
 
+/**
+ * 允许通过 API 覆盖的工艺参数白名单。只放"影响成型质量"的键，机器级 G-code
+ * （machine_start_gcode / change_filament_gcode 等）一律不在其内：那些键写错就等于
+ * 让打印机执行任意指令，不是调参。
+ */
+const ALLOWED_OVERRIDES = new Set([
+  // 层与壳
+  "layer_height", "initial_layer_print_height", "wall_loops",
+  "top_shell_layers", "bottom_shell_layers", "top_shell_thickness", "bottom_shell_thickness",
+  // 填充
+  "sparse_infill_density", "sparse_infill_pattern", "sparse_infill_speed",
+  "internal_solid_infill_speed", "top_surface_speed",
+  // 支撑
+  "enable_support", "support_type", "support_style", "support_threshold_angle",
+  "support_top_z_distance", "support_bottom_z_distance", "support_object_xy_distance",
+  "support_on_build_plate_only", "support_interface_top_layers",
+  "tree_support_branch_diameter_organic",
+  // 速度与走线
+  "outer_wall_speed", "inner_wall_speed", "initial_layer_speed", "initial_layer_infill_speed",
+  "travel_speed", "bridge_speed", "overhang_1_4_speed", "overhang_2_4_speed",
+  "overhang_3_4_speed", "overhang_4_4_speed", "overhang_totally_speed",
+  "reduce_crossing_wall", "z_hop_types", "wipe_tower_extra_rib_length",
+  // 表面
+  "seam_position", "seam_slope_type", "seam_slope_conditional", "ironing_type", "brim_type", "brim_width",
+]);
+
+/** 过滤掉白名单外的键；值统一转字符串并截断，防止超长内容写进配置。 */
+function pickAllowedOverrides(input: Record<string, string> | undefined): Record<string, string> {
+  if (!input || typeof input !== "object" || Array.isArray(input)) return {};
+  const out: Record<string, string> = {};
+  for (const [key, value] of Object.entries(input)) {
+    if (!ALLOWED_OVERRIDES.has(key)) continue;
+    if (typeof value !== "string" && typeof value !== "number") continue;
+    out[key] = String(value).slice(0, 32);
+  }
+  return out;
+}
+
 /** The print presets offered in the UI. Each is an official U1 process plus the reliability changes and its own overrides. */
 export const PRINT_MODES = {
   fast: {
@@ -269,7 +307,14 @@ export async function sliceForU1(req: SliceRequest): Promise<SliceResult> {
   const machine = flattenPreset(U1_MACHINE);
   for (const [key, value] of Object.entries(RELIABILITY_MACHINE)) setKey(machine, key, value);
   const process = flattenPreset(mode.process);
-  const overrides = { ...RELIABILITY_PROCESS, ...mode.overrides, ...(req.overrides ?? {}), ...optionsToOverrides(req.options) };
+  // 只接受已知的工艺参数键：切片请求来自浏览器，若不限制，任何能调接口的人都能把
+  // machine_start_gcode 之类的机器级指令塞进要上机的 G-code。这里在唯一入口处收口。
+  const overrides = {
+    ...RELIABILITY_PROCESS,
+    ...mode.overrides,
+    ...pickAllowedOverrides(req.overrides),
+    ...optionsToOverrides(req.options),
+  };
   for (const [key, value] of Object.entries(overrides)) setKey(process, key, value);
   const limits = layerLimits(req.options, process, machine);
   let plan: LayerPlan | null = null;
