@@ -41,13 +41,15 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ instanceId:
         ? `配置 ${id} 不属于设计 ${designId}，已跳过作者说明解析（避免误用其它模型的说明）`
         : `未提供设计 id，已跳过作者说明解析（配置 id 与设计 id 会撞号，可能读到别的模型）`);
     }
-    if (hints.supports === "forbidden" && metrics.overhang45Percent >= 12) {
-      hintConflicts.push(`几何指标建议开支撑（悬垂 ${metrics.overhang45Percent.toFixed(1)}%），但作者说明禁止支撑 → 已按作者说明关闭`);
+    if (hints.supports === "forbidden" && metrics.overhangPercent >= 12) {
+      hintConflicts.push(`几何指标建议开支撑（悬垂 ${metrics.overhangPercent.toFixed(1)}%，离地悬垂面积占比），但作者说明禁止支撑 → 已按作者说明关闭`);
     }
-    if (hints.supports === "required" && metrics.overhang45Percent < 12) {
-      hintConflicts.push(`几何指标未建议开支撑（悬垂 ${metrics.overhang45Percent.toFixed(1)}%），但作者说明要求支撑 → 已按作者说明开启`);
+    if (hints.supports === "required" && metrics.overhangPercent < 12) {
+      hintConflicts.push(`几何指标未建议开支撑（悬垂 ${metrics.overhangPercent.toFixed(1)}%，离地悬垂面积占比），但作者说明要求支撑 → 已按作者说明开启`);
     }
-    return NextResponse.json({ creator: info.creator, metrics, presets, hints, hintsSource, hintConflicts, plateCount: info.plates.length || 1, objectOverrides: info.objectOverrides });
+    // 45°/60° 是内部诊断口径，不向前端暴露，避免同一模型出现多个悬垂百分比。
+    const { overhang45Percent: _overhang45, overhang60Percent: _overhang60, ...publicMetrics } = metrics;
+    return NextResponse.json({ creator: info.creator, metrics: publicMetrics, presets, hints, hintsSource, hintConflicts, plateCount: info.plates.length || 1, objectOverrides: info.objectOverrides });
   } catch (err) {
     // 推荐面板可在下载失败时继续显示其它档位，故返回明确错误而不是 500。
     const message = err instanceof Error ? err.message : String(err);

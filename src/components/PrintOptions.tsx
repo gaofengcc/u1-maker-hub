@@ -91,7 +91,7 @@ function overhangSummary(preset: RecommendationPreset | null | undefined, option
 function Estimate({ value, exact }: { value?: EstimateValue | null; exact?: boolean }) {
   return (
     <span className="muted small">
-      {t("print.estimateTime")} {duration(value?.seconds)} · {t("print.estimateFilament")} {value?.grams == null ? "—" : `${value.grams.toFixed(1)}g`}{exact ? ` · ${t("print.estimateExact")}` : ""}
+      {value ? <>{t("print.estimateTime")} {duration(value.seconds)} · {t("print.estimateFilament")} {value.grams == null ? "—" : `${value.grams.toFixed(1)}g`}{exact ? ` · ${t("print.estimateExact")}` : ""}</> : t("print.exactPrompt")}
     </span>
   );
 }
@@ -352,6 +352,7 @@ export function PrintOptionsPanel(props: PrintOptionsPanelProps) {
   const [exact, setExact] = useState<Record<string, EstimateValue | null>>({});
   const [exactState, setExactState] = useState<Record<string, "idle" | "running" | "done" | "error">>({});
   const [exactErrors, setExactErrors] = useState<Record<string, string>>({});
+  const [showRough, setShowRough] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [hints, setHints] = useState<ModelHints | null>(props.hints ?? null);
   const [hintConflicts, setHintConflicts] = useState<string[]>(props.hintConflicts ?? []);
@@ -423,8 +424,14 @@ export function PrintOptionsPanel(props: PrintOptionsPanelProps) {
       plans.map(async ([key, , options]) => {
         try {
           const preset = key === "speed" ? speed : key === "recommend" ? recommend : undefined;
-          const result = await api<EstimateValue>("/api/estimate", { method: "POST", body: JSON.stringify({ instanceId, plate, site, mode: key === "speed" ? "fast" : key === "recommend" ? "fine" : "standard", options, overrides: preset?.overrides ?? {}, exact: true }) });
-          setExact((prev) => ({ ...prev, [key]: result }));
+          const task = await api<{ id: string }>("/api/slice", { method: "POST", body: JSON.stringify({ instanceId, plate, site, mode: key === "speed" ? "fast" : key === "recommend" ? "fine" : "standard", options, overrides: preset?.overrides ?? {} }) });
+          let result: { result?: { minutes: number; grams: number }; status: string; progress?: number; error?: string } = { status: "pending" };
+          for (let attempt = 0; attempt < 120 && result.status !== "done" && result.status !== "error"; attempt++) {
+            await new Promise((resolve) => setTimeout(resolve, 500));
+            result = await api<typeof result>(`/api/slice/${task.id}`);
+          }
+          if (result.status === "error" || !result.result) throw new Error(result.error ?? t("print.estimateUnavailable"));
+          setExact((prev) => ({ ...prev, [key]: { seconds: result.result!.minutes * 60, grams: result.result!.grams, cached: Boolean((result as { cached?: boolean }).cached) } }));
           setExactState((prev) => ({ ...prev, [key]: "done" }));
         } catch (e) {
           setExactErrors((prev) => ({ ...prev, [key]: (e as Error).message }));
@@ -441,7 +448,7 @@ export function PrintOptionsPanel(props: PrintOptionsPanelProps) {
     ["speed", t("print.tabSpeed")],
     ["custom", t("print.tabCustom")],
   ];
-  const displayEstimate = exact[active] ?? rough[active];
+  const displayEstimate = exact[active] ?? (showRough ? rough[active] : null);
 
   return (
     <section className="panel" style={{ gap: 0 }} aria-labelledby="finetune">
@@ -453,6 +460,7 @@ export function PrintOptionsPanel(props: PrintOptionsPanelProps) {
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
           <Estimate value={displayEstimate} exact={Boolean(exact[active])} />
           <button type="button" className="btn btn-sm" onClick={exactCompare}>{t("print.exactCompare")}</button>
+          {!showRough && <button type="button" className="btn btn-sm" onClick={() => setShowRough(true)}>{t("print.roughEstimate")}</button>}
         </div>
       </div>
 
@@ -502,7 +510,7 @@ export function PrintOptionsPanel(props: PrintOptionsPanelProps) {
             <div className="opt-text"><span className="opt-title">{t("print.recommendTitle")}</span><span className="opt-desc">{(recommend?.reasons ?? [t("print.recommendFallback")]).join("；")}</span><span className="opt-hint">{overhangSummary(recommend, recOptions, material)}</span></div>
             <button type="button" className="btn btn-sm" onClick={() => { apply(recOptions); onOverridesChange?.(recommend?.overrides ?? {}); if (recommend?.mode) onPresetMode?.(recommend.mode); }}>{t("print.usePreset")}</button>
           </div>
-          <Estimate value={exact.recommend ?? rough.recommend} exact={Boolean(exact.recommend)} />
+          <Estimate value={exact.recommend ?? (showRough ? rough.recommend : null)} exact={Boolean(exact.recommend)} />
         </div>
       )}
       {active === "speed" && (
@@ -511,9 +519,10 @@ export function PrintOptionsPanel(props: PrintOptionsPanelProps) {
             <div className="opt-text"><span className="opt-title">{t("print.speedTitle")}</span><span className="opt-desc">{(speed?.reasons ?? [t("print.speedFallback")]).join("；")}</span><span className="opt-hint">{overhangSummary(speed, speedOptions, material)}</span></div>
             <button type="button" className="btn btn-sm" onClick={() => { apply(speedOptions); onOverridesChange?.(speed?.overrides ?? {}); if (speed?.mode) onPresetMode?.(speed.mode); }}>{t("print.usePreset")}</button>
           </div>
-          <Estimate value={exact.speed ?? rough.speed} exact={Boolean(exact.speed)} />
+          <Estimate value={exact.speed ?? (showRough ? rough.speed : null)} exact={Boolean(exact.speed)} />
         </div>
       )}
+      {showRough && <p className="small muted">{t("print.roughEstimateWarning")}</p>}
       {active === "custom" && (
         <>
           {changedCount > 0 && <div className="notice small">{t("print.changed", { n: changedCount })}</div>}
