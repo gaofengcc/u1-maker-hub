@@ -32,6 +32,8 @@ export type Settings = {
     model?: string;
     apiKey?: string;
   };
+  /** 上次用过的打印参数，新任务默认从这里起步（合并自公开仓库的 printDefaults）。 */
+  printDefaults?: Partial<Record<string, unknown>>;
 };
 
 const DEFAULT_SETTINGS: Settings = {

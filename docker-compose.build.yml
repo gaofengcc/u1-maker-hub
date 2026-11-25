@@ -1,0 +1,9 @@
+# Builds the image from this checkout instead of pulling it:
+#   docker compose -f docker-compose.yml -f docker-compose.build.yml up -d --build
+services:
+  u1-maker-hub:
+    image: u1-maker-hub:local
+    build:
+      context: .
+      args:
+        ORCA_VERSION: "2.4.2"
