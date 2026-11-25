@@ -4,7 +4,7 @@ import type { Triangle } from "../src/lib/recommend.ts";
 function cube(size: number): Triangle[] {
   const v = [[0,0,0],[size,0,0],[size,size,0],[0,size,0],[0,0,size],[size,0,size],[size,size,size],[0,size,size]];
   const f = [[0,2,1],[0,3,2],[4,5,6],[4,6,7],[0,1,5],[0,5,4],[1,2,6],[1,6,5],[2,3,7],[2,7,6],[3,0,4],[3,4,7]];
-  return f.map(([a,b,c]) => [...v[a], ...v[b], ...v[c]] as Triangle);
+  return f.map(([a,b,c]) => [...v[a], ...v[b], ...v[c]] as unknown as Triangle);
 }
 
 const box = metricsFromTriangles(cube(20));
@@ -22,7 +22,7 @@ if (Math.abs(slope.surfaceAreaMm2 - expectedArea) > 1e-6) throw new Error("æ–œé
 const tall = metricsFromTriangles(cube(20).map((t) => {
   const out = [...t] as number[];
   for (let i = 2; i < 9; i += 3) out[i] *= 7.5;
-  return out as Triangle;
+  return out as unknown as Triangle;
 }));
 const flat = box;
 const tallRec = recommendFromMetrics(tall);
