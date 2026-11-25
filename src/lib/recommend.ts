@@ -23,8 +23,6 @@ export function metricsFromTriangles(triangles: Iterable<Triangle>): PlateMetric
   const bbox = [Infinity, Infinity, Infinity, -Infinity, -Infinity, -Infinity];
   let area = 0;
   let signedVolume = 0;
-  let over45 = 0;
-  let over60 = 0;
   let minZ = Infinity;
   let triangleCount = 0;
   const rows: { points: Triangle; area: number; nz: number }[] = [];
@@ -58,10 +56,6 @@ export function metricsFromTriangles(triangles: Iterable<Triangle>): PlateMetric
     // Divergence theorem. Closed meshes with mixed winding use the absolute sum as a
     // conservative volume. For open meshes we fall back to the sum of tetrahedra.
     signedVolume += (x1 * (y2 * z3 - z2 * y3) - y1 * (x2 * z3 - z2 * x3) + z1 * (x2 * y3 - y2 * x3)) / 6;
-    // 平放在平台上的底面属于贴床面积，不应再被算作悬垂面。
-    const horizontalDown = nz < -0.999 && Math.abs(z1 - z2) < 1e-6 && Math.abs(z1 - z3) < 1e-6;
-    if (!horizontalDown && nz < -Math.sin(Math.PI / 4)) over45 += triangleArea;
-    if (!horizontalDown && nz < -Math.sin(Math.PI / 3)) over60 += triangleArea;
     rows.push({ points, area: triangleArea, nz });
     triangleCount++;
   }
@@ -76,13 +70,21 @@ export function metricsFromTriangles(triangles: Iterable<Triangle>): PlateMetric
 
   const heightMm = Math.max(0, bbox[5] - bbox[2]);
   const tolerance = Math.max(0.05, heightMm * 0.001);
+  let over45 = 0;
+  let over60 = 0;
   let bedContactAreaMm2 = 0;
   for (const row of rows) {
     const p = row.points;
     const lowest = Math.min(p[2], p[5], p[8]);
-    if (row.nz < 0 && lowest <= minZ + tolerance && p[2] <= minZ + tolerance && p[5] <= minZ + tolerance && p[8] <= minZ + tolerance) {
+    const atBed = lowest <= minZ + tolerance && p[2] <= minZ + tolerance && p[5] <= minZ + tolerance && p[8] <= minZ + tolerance;
+    if (row.nz < 0 && atBed) {
       bedContactAreaMm2 += row.area;
     }
+    // 水平朝下面只有位于最低处才是贴床面，中腰的水平顶棚仍需支撑。
+    const horizontalDown = row.nz < -0.999 && Math.abs(p[2] - p[5]) < 1e-6 && Math.abs(p[2] - p[8]) < 1e-6 && atBed;
+    // 45° 边界面按“不计入”处理，留出微小数值误差容差。
+    if (!horizontalDown && row.nz < -Math.sin(Math.PI / 4) - 1e-12) over45 += row.area;
+    if (!horizontalDown && row.nz < -Math.sin(Math.PI / 3) - 1e-12) over60 += row.area;
   }
   // A near-horizontal footprint may be split into several triangles, so the bottom
   // contact area is the best base estimate available from the input mesh.
@@ -192,20 +194,34 @@ export type RoughEstimate = {
 /**
  * 粗估公式：耗材体积 ≈ 外壳体积 + 填充体积。外壳体积 ≈ 表面积 × 墙圈数 ×
  * 挤出宽度(0.42mm) × 0.7(重叠修正)，填充体积 ≈ 体积 × 填充密度。重量 = 体积 ×
- * 材料密度（g/cm³）。时间 ≈ 各特征体积 ÷ 平均流量 + 层数 × 1.5s + 换料次数 × 12s。
+ * 材料密度（g/cm³）。时间使用按层高标定的端到端等效流量，另加换料和熨平时间。
+ * 流量常数来自 VM200 / U1 / PLA / 20mm 立方体实测，包含空驶与加减速。
  * 粗估的主要误差项是支撑体积、多色换料、加速度限制和小特征减速。
  */
-export function roughEstimate(metrics: PlateMetrics, options: PrintOptions, materialType = "PLA", filamentChanges = 0): RoughEstimate {
+export function roughEstimate(metrics: PlateMetrics, options: PrintOptions, materialType = "PLA", filamentChanges = 0, layerHeight = 0.2): RoughEstimate {
   const shell = metrics.surfaceAreaMm2 * Math.max(1, options.wallLoops) * 0.42 * 0.7;
   const support = options.supports === "off" ? 0 : metrics.volumeMm3 * (metrics.overhang45Percent / 100) * 0.15;
   const infill = metrics.volumeMm3 * Math.max(0, Math.min(100, options.infillDensity)) / 100;
   const materialVolumeMm3 = shell + infill + support;
   const density = MATERIAL_DENSITY[materialType.toUpperCase()] ?? MATERIAL_DENSITY.PLA;
   const grams = materialVolumeMm3 / 1000 * density;
-  const layerHeight = options.layers === "fixed" ? 0.2 : 0.16;
-  const layers = Math.max(1, Math.ceil(metrics.heightMm / layerHeight));
-  const averageFlow = 8;
-  const seconds = materialVolumeMm3 / averageFlow + layers * 1.5 + Math.max(0, filamentChanges) * 12;
+  const h = Number.isFinite(layerHeight) && layerHeight > 0 ? layerHeight : 0.2;
+  // VM200 / U1 / PLA / 20mm 立方体实测，含空驶与加减速。区间外按端点，区间内线性插值。
+  const flowAt = (height: number) => {
+    const points: [number, number][] = [[0.12, 2.75], [0.20, 3.46], [0.28, 4.10]];
+    if (height <= points[0][0]) return points[0][1];
+    if (height >= points[2][0]) return points[2][1];
+    for (let i = 1; i < points.length; i++) {
+      if (height <= points[i][0]) {
+        const [h1, f1] = points[i - 1];
+        const [h2, f2] = points[i];
+        return f1 + (f2 - f1) * (height - h1) / (h2 - h1);
+      }
+    }
+    return points[2][1];
+  };
+  let seconds = materialVolumeMm3 / flowAt(h) + Math.max(0, filamentChanges) * 12;
+  if (options.ironing) seconds *= 1.25;
   return {
     seconds,
     grams,

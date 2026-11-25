@@ -16,7 +16,7 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ instanceId:
     const { file } = await downloadInstance(id, site);
     const [project, info] = await Promise.all([loadProject(file), readProject(file)]);
     const triangles: Triangle[] = [];
-    for (const item of itemsOnPlate(project, plate)) eachTriangle(project, item, (triangle) => triangles.push(triangle));
+    for (const item of itemsOnPlate(project, plate)) eachTriangle(project, item, (triangle) => triangles.push(triangle.slice()));
     const metrics = metricsFromTriangles(triangles);
     const materialType = info.filaments[0]?.type ?? "PLA";
     const presets = recommendFromMetrics(metrics, { materialType });
