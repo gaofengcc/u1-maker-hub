@@ -13,7 +13,7 @@ import { t } from "@/lib/i18n";
 import { footprint, U1_BED } from "@/lib/packing";
 import { usePlate } from "@/lib/usePlate";
 import { useSupportsOption } from "@/lib/useCreatorSupports";
-import { PrintOptionsPanel } from "./PrintOptions";
+import { PrintOptionsPanel, type ModelPreset } from "./PrintOptions";
 import { SizePanel } from "./SizePanel";
 import { ToolpathViewer } from "./ToolpathViewer";
 import { DownloadIcon, LayersIcon, PlateIcon, SendIcon } from "./Icons";
@@ -69,6 +69,10 @@ type Props = {
   /** Width, depth and height at 100 %, to tell before the preview loads whether it fits. */
   baseSize?: [number, number, number];
   creatorSupports: PrintOptions["supports"] | null;
+  /** MakerWorld 实例上下文，用于加载当前盘的几何推荐。 */
+  instanceId?: number;
+  site?: string;
+  modelPreset?: ModelPreset | null;
 
   /** False blocks slicing (for example without the Bambu login); `notice` says why. */
   canSlice: boolean;
@@ -229,7 +233,16 @@ export function PrintSetup(props: Props) {
       <section className="col-main">
         {props.media}
         <div style={{ order: 5 }}>
-          <PrintOptionsPanel value={options} defaults={supportsOption.defaults} onChange={supportsOption.onChange} creatorSupports={props.creatorSupports} />
+          <PrintOptionsPanel
+            value={options}
+            defaults={supportsOption.defaults}
+            onChange={supportsOption.onChange}
+            creatorSupports={props.creatorSupports}
+            instanceId={props.instanceId == null ? undefined : String(props.instanceId)}
+            plate={plate}
+            site={props.site}
+            modelPreset={props.modelPreset}
+          />
         </div>
         {props.footer}
       </section>

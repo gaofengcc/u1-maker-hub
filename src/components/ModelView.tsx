@@ -218,6 +218,8 @@ export function ModelView({ design, site, settings, modes, defaults, filamentPre
         estimate={{ label: t("model.makerWorldTime"), seconds: selectedPlate?.seconds ?? instance.seconds, grams: selectedPlate?.grams ?? instance.grams }}
         mesh={{ load: () => loadPreviewMesh(instance.id, printedPlate, site), autoShow: false, available: settings.loggedIn }}
         creatorSupports={creatorSupports}
+        instanceId={instance.id}
+        site={site}
         canSlice={settings.loggedIn}
         notice={
           <>

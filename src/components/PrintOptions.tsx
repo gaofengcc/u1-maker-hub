@@ -284,6 +284,7 @@ export function PrintOptionsPanel(props: PrintOptionsPanelProps) {
   const { value, defaults, onChange, creatorSupports = null, instanceId, plate = 1, site, modelPreset } = props;
   const [active, setActive] = useState<TabKey>("recommend");
   const [loaded, setLoaded] = useState<PrintOptionsPanelProps["recommendations"]>(props.recommendations ?? null);
+  const [creatorPreset, setCreatorPreset] = useState<ModelPreset | null>(props.modelPreset ?? null);
   const [metrics, setMetrics] = useState<MetricsLike | null>(null);
   const [exact, setExact] = useState<Record<string, EstimateValue | null>>({});
   const [exactState, setExactState] = useState<Record<string, "idle" | "running" | "done" | "error">>({});
@@ -291,13 +292,27 @@ export function PrintOptionsPanel(props: PrintOptionsPanelProps) {
 
   useEffect(() => {
     setLoaded(props.recommendations ?? null);
-    if (!instanceId) return;
+    setCreatorPreset(props.modelPreset ?? null);
+    if (!instanceId) {
+      setMetrics(null);
+      return;
+    }
     let alive = true;
-    api<{ metrics?: MetricsLike; presets?: PrintOptionsPanelProps["recommendations"] }>(`/api/recommend/${encodeURIComponent(instanceId)}?plate=${plate}${site ? `&site=${encodeURIComponent(site)}` : ""}`)
+    api<{ metrics?: MetricsLike; presets?: PrintOptionsPanelProps["recommendations"]; creator?: { options?: Partial<Options>; layerHeight?: number | null; infillPattern?: string | null; supportAngle?: number | null; materialTypes?: string[]; materialColors?: string[]; printer?: string; plateCount?: number } | null }>(`/api/recommend/${encodeURIComponent(instanceId)}?plate=${plate}${site ? `&site=${encodeURIComponent(site)}` : ""}`)
       .then((result) => {
         if (!alive) return;
         setMetrics(result.metrics ?? null);
         if (result.presets) setLoaded(result.presets);
+        if (result.creator) setCreatorPreset({
+          options: result.creator.options,
+          layerHeight: result.creator.layerHeight ?? undefined,
+          material: result.creator.materialTypes?.[0],
+          color: result.creator.materialColors?.[0],
+          machine: result.creator.printer,
+          plateCount: result.creator.plateCount,
+          infillPattern: result.creator.infillPattern ?? undefined,
+          supportAngle: result.creator.supportAngle ?? undefined,
+        });
       })
       .catch(() => {
         /* recommendation is optional and the current defaults remain usable */
@@ -314,7 +329,7 @@ export function PrintOptionsPanel(props: PrintOptionsPanelProps) {
   const rough: Record<string, EstimateValue | null> = {
     recommend: recommend?.estimate ?? roughEstimate(metrics, recOptions),
     speed: speed?.estimate ?? roughEstimate(metrics, speedOptions),
-    model: roughEstimate(metrics, { ...defaults, ...(modelPreset?.options ?? {}) }),
+    model: roughEstimate(metrics, { ...defaults, ...(creatorPreset?.options ?? modelPreset?.options ?? {}) }),
     custom: roughEstimate(metrics, value),
   };
 
@@ -335,7 +350,7 @@ export function PrintOptionsPanel(props: PrintOptionsPanelProps) {
     await Promise.all(
       plans.map(async ([key, , options]) => {
         try {
-          const result = await api<EstimateValue>("/api/estimate", { method: "POST", body: JSON.stringify({ instanceId, plate, mode: key === "speed" ? "fast" : key === "recommend" ? "fine" : "standard", options, exact: true }) });
+          const result = await api<EstimateValue>("/api/estimate", { method: "POST", body: JSON.stringify({ instanceId, plate, site, mode: key === "speed" ? "fast" : key === "recommend" ? "fine" : "standard", options, exact: true }) });
           setExact((prev) => ({ ...prev, [key]: result }));
           setExactState((prev) => ({ ...prev, [key]: "done" }));
         } catch (e) {
@@ -380,12 +395,12 @@ export function PrintOptionsPanel(props: PrintOptionsPanelProps) {
         <div className="opt-row" style={{ display: "block" }}>
           <div className="opt-text">
             <span className="opt-title">{t("print.modelPresetReadOnly")}</span>
-            {modelPreset ? <>
-              <span className="opt-desc">{t("print.modelPresetSummary", { layer: modelPreset.layerHeight ?? "—", material: modelPreset.material ?? "—", machine: modelPreset.machine ?? "—", plates: modelPreset.plateCount ?? "—" })}</span>
-              <span className="opt-hint">{t("print.modelPresetInfill", { pattern: modelPreset.infillPattern ?? "—", angle: modelPreset.supportAngle ?? "—" })}</span>
+            {creatorPreset ? <>
+              <span className="opt-desc">{t("print.modelPresetSummary", { layer: creatorPreset.layerHeight ?? "—", material: creatorPreset.material ?? "—", machine: creatorPreset.machine ?? "—", plates: creatorPreset.plateCount ?? "—" })}</span>
+              <span className="opt-hint">{t("print.modelPresetInfill", { pattern: creatorPreset.infillPattern ?? "—", angle: creatorPreset.supportAngle ?? "—" })}</span>
             </> : <span className="opt-desc">{t("print.modelPresetFallback")}</span>}
           </div>
-          {modelPreset && <button type="button" className="btn btn-sm" onClick={() => apply({ ...defaults, ...(modelPreset.options ?? {}) })}>{t("print.applyCreatorPreset")}</button>}
+          {creatorPreset && <button type="button" className="btn btn-sm" onClick={() => apply({ ...defaults, ...(creatorPreset.options ?? {}) })}>{t("print.applyCreatorPreset")}</button>}
         </div>
       )}
       {active === "recommend" && (
