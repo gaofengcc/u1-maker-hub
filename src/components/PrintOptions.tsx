@@ -32,6 +32,8 @@ export type PrintOptionsPanelProps = {
   creatorSupports?: Options["supports"] | null;
   /** Optional model context. When omitted the panel still shows all four tabs with local defaults. */
   instanceId?: string;
+  /** 所属设计 id。配置 id 与设计 id 会撞号，说明必须按设计 id 取，否则会读到别的模型。 */
+  designId?: number;
   plate?: number;
   site?: string;
   modelPreset?: ModelPreset | null;
@@ -342,7 +344,7 @@ type TabKey = "model" | "recommend" | "speed" | "custom";
 
 /** 四档打印参数面板。旧调用方不传模型信息时，推荐档使用当前默认值并保持可用。 */
 export function PrintOptionsPanel(props: PrintOptionsPanelProps) {
-  const { value, defaults, onChange, creatorSupports = null, instanceId, plate = 1, site, modelPreset, onOverridesChange, onPresetMode } = props;
+  const { value, defaults, onChange, creatorSupports = null, instanceId, designId, plate = 1, site, modelPreset, onOverridesChange, onPresetMode } = props;
   const [active, setActive] = useState<TabKey>("recommend");
   const [loaded, setLoaded] = useState<PrintOptionsPanelProps["recommendations"]>(props.recommendations ?? null);
   const [creatorPreset, setCreatorPreset] = useState<ModelPreset | null>(props.modelPreset ?? null);
@@ -364,7 +366,7 @@ export function PrintOptionsPanel(props: PrintOptionsPanelProps) {
       return;
     }
     let alive = true;
-    api<{ metrics?: MetricsLike; presets?: PrintOptionsPanelProps["recommendations"]; hints?: ModelHints; hintConflicts?: string[]; creator?: { options?: Partial<Options>; layerHeight?: number | null; infillPattern?: string | null; supportAngle?: number | null; materialTypes?: string[]; materialColors?: string[]; printer?: string; plateCount?: number } | null }>(`/api/recommend/${encodeURIComponent(instanceId)}?plate=${plate}${site ? `&site=${encodeURIComponent(site)}` : ""}`)
+    api<{ metrics?: MetricsLike; presets?: PrintOptionsPanelProps["recommendations"]; hints?: ModelHints; hintConflicts?: string[]; creator?: { options?: Partial<Options>; layerHeight?: number | null; infillPattern?: string | null; supportAngle?: number | null; materialTypes?: string[]; materialColors?: string[]; printer?: string; plateCount?: number } | null }>(`/api/recommend/${encodeURIComponent(instanceId)}?plate=${plate}${site ? `&site=${encodeURIComponent(site)}` : ""}${designId ? `&design=${designId}` : ""}`)
       .then((result) => {
         if (!alive) return;
         setMetrics(result.metrics ?? null);
@@ -388,7 +390,7 @@ export function PrintOptionsPanel(props: PrintOptionsPanelProps) {
     return () => {
       alive = false;
     };
-  }, [instanceId, plate, site, props.recommendations]);
+  }, [instanceId, designId, plate, site, props.recommendations]);
 
   const recommend = loaded?.recommend;
   const speed = loaded?.speed;

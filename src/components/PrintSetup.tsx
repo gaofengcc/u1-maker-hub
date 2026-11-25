@@ -72,6 +72,8 @@ type Props = {
   creatorSupports: PrintOptions["supports"] | null;
   /** MakerWorld 实例上下文，用于加载当前盘的几何推荐。 */
   instanceId?: number;
+  /** 所属设计 id：作者说明必须按设计 id 取，配置 id 会与设计 id 撞号。 */
+  designId?: number;
   site?: string;
   modelPreset?: ModelPreset | null;
 
@@ -243,6 +245,7 @@ export function PrintSetup(props: Props) {
             onChange={supportsOption.onChange}
             creatorSupports={props.creatorSupports}
             instanceId={props.instanceId == null ? undefined : String(props.instanceId)}
+            designId={props.designId}
             plate={plate}
             site={props.site}
             modelPreset={props.modelPreset}

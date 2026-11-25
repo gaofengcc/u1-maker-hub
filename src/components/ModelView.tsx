@@ -219,6 +219,7 @@ export function ModelView({ design, site, settings, modes, defaults, filamentPre
         mesh={{ load: () => loadPreviewMesh(instance.id, printedPlate, site), autoShow: false, available: settings.loggedIn }}
         creatorSupports={creatorSupports}
         instanceId={instance.id}
+        designId={design.id}
         site={site}
         canSlice={settings.loggedIn}
         notice={
