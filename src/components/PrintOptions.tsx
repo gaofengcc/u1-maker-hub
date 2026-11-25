@@ -288,6 +288,7 @@ export function PrintOptionsPanel(props: PrintOptionsPanelProps) {
   const [metrics, setMetrics] = useState<MetricsLike | null>(null);
   const [exact, setExact] = useState<Record<string, EstimateValue | null>>({});
   const [exactState, setExactState] = useState<Record<string, "idle" | "running" | "done" | "error">>({});
+  const [exactErrors, setExactErrors] = useState<Record<string, string>>({});
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -346,6 +347,7 @@ export function PrintOptionsPanel(props: PrintOptionsPanelProps) {
       ["custom", t("print.tabCustom"), value],
     ];
     setError(null);
+    setExactErrors({});
     setExactState(Object.fromEntries(plans.map(([key]) => [key, "running"])));
     await Promise.all(
       plans.map(async ([key, , options]) => {
@@ -354,6 +356,7 @@ export function PrintOptionsPanel(props: PrintOptionsPanelProps) {
           setExact((prev) => ({ ...prev, [key]: result }));
           setExactState((prev) => ({ ...prev, [key]: "done" }));
         } catch (e) {
+          setExactErrors((prev) => ({ ...prev, [key]: (e as Error).message }));
           setExactState((prev) => ({ ...prev, [key]: "error" }));
           setError((prev) => prev ?? (e as Error).message);
         }
@@ -431,7 +434,7 @@ export function PrintOptionsPanel(props: PrintOptionsPanelProps) {
       {Object.keys(exactState).length > 0 && (
         <div className="opt-row" style={{ display: "block" }}>
           <strong>{t("print.exactCompare")}</strong>
-          {(["recommend", "speed", "custom"] as const).map((key) => <div key={key} className="small">{key === "recommend" ? t("print.tabRecommend") : key === "speed" ? t("print.tabSpeed") : t("print.tabCustom")}：{exactState[key] === "running" ? t("print.exactSlicing") : exactState[key] === "done" ? <Estimate value={exact[key]} exact /> : t("print.exactFailed")}</div>)}
+          {(["recommend", "speed", "custom"] as const).map((key) => <div key={key} className="small">{key === "recommend" ? t("print.tabRecommend") : key === "speed" ? t("print.tabSpeed") : t("print.tabCustom")}：{exactState[key] === "running" ? t("print.exactSlicing") : exactState[key] === "done" ? <Estimate value={exact[key]} exact /> : `${t("print.exactFailed")}（${exactErrors[key] ?? t("print.estimateUnavailable")}）`}</div>)}
         </div>
       )}
     </section>
