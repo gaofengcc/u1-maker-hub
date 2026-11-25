@@ -13,10 +13,30 @@ if (Math.abs(box.surfaceAreaMm2 - 2400) > 1e-6) throw new Error(`立方体表面
 if (box.overhang45Percent !== 0) throw new Error(`立方体悬垂错误 ${box.overhang45Percent}`);
 if (Math.abs(box.bedContactAreaMm2 - 400) > 1e-6) throw new Error(`贴床面积错误 ${box.bedContactAreaMm2}`);
 
-const sloped: Triangle = [0, 0, 0, 0, 20, -10, 20, 0, 0];
-const slope = metricsFromTriangles([sloped]);
-if (!(slope.overhang45Percent > 0)) throw new Error(`斜面未识别悬垂 ${slope.overhang45Percent}`);
-const expectedArea = Math.hypot(20, 10) * 20 / 2;
+// 复用同一数组的迭代器必须与深拷贝后的三角面得到完全相同的指标。
+const reused = new Array<number>(9);
+const source: Triangle[] = cube(20).slice(0, 4);
+const reusedMetrics = metricsFromTriangles((function* () {
+  for (const triangle of source) {
+    reused.splice(0, 9, ...triangle);
+    yield reused;
+  }
+})());
+const copiedMetrics = metricsFromTriangles(source.map((triangle) => [...triangle]));
+if (JSON.stringify(reusedMetrics) !== JSON.stringify(copiedMetrics)) throw new Error("复用三角面数组导致指标不一致");
+
+// 45° 斜面在阈值边界按不计入处理。
+const slope45: Triangle = [0, 0, 10, 0, 20, -10, 20, 0, 10];
+const slope = metricsFromTriangles([slope45]);
+if (slope.overhang45Percent !== 0) throw new Error(`45° 边界斜面不应计入悬垂 ${slope.overhang45Percent}`);
+
+// 中腰水平朝下面属于悬垂，z=minZ 的水平朝下面属于贴床面。
+const middleDown: Triangle = [0, 0, 5, 0, 20, 5, 20, 0, 5];
+const bedDown: Triangle = [0, 0, 0, 0, 20, 0, 20, 0, 0];
+const horizontal = metricsFromTriangles([middleDown, bedDown]);
+if (!(horizontal.overhang45Percent > 0)) throw new Error(`中腰水平朝下面未计入悬垂 ${horizontal.overhang45Percent}`);
+if (horizontal.bedContactAreaMm2 <= 0) throw new Error(`最低处水平朝下面未识别贴床面 ${horizontal.bedContactAreaMm2}`);
+const expectedArea = Math.hypot(20, 20) * 20 / 2;
 if (Math.abs(slope.surfaceAreaMm2 - expectedArea) > 1e-6) throw new Error("斜面面积不一致");
 
 const tall = metricsFromTriangles(cube(20).map((t) => {
@@ -32,6 +52,7 @@ if (tallRec.recommend.overrides.outer_wall_speed === flatRec.recommend.overrides
 if (tallRec.recommend.options.wallLoops === flatRec.recommend.options.wallLoops) throw new Error("细高件与扁大件墙数未区分");
 console.log("verify-recommend: PASS");
 console.log(`cube volume=${box.volumeMm3} surface=${box.surfaceAreaMm2} overhang45=${box.overhang45Percent}% bed=${box.bedContactAreaMm2}`);
-console.log(`slope overhang45=${slope.overhang45Percent.toFixed(2)}% area=${slope.surfaceAreaMm2.toFixed(2)}`);
+console.log(`slope45 overhang45=${slope.overhang45Percent.toFixed(2)}% area=${slope.surfaceAreaMm2.toFixed(2)}`);
+console.log(`horizontal overhang45=${horizontal.overhang45Percent.toFixed(2)}% bed=${horizontal.bedContactAreaMm2.toFixed(2)}`);
 console.log(`tall brim=${tallRec.recommend.options.brim} speed=${tallRec.recommend.overrides.outer_wall_speed} walls=${tallRec.recommend.options.wallLoops}`);
 console.log(`flat brim=${flatRec.recommend.options.brim} speed=${flatRec.recommend.overrides.outer_wall_speed} walls=${flatRec.recommend.options.wallLoops}`);
