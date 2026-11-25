@@ -111,8 +111,9 @@ export function extractHints(summaryHtml: string): ModelHints {
       /\bno\s+supports?\b|\bwithout\s+supports?\b|\bsupports?\s*[:：]\s*(?:none|no|off)\b/i.test(sentence);
     const requiredSupport =
       /(?:需要|务必|必须|建议开)[\s\S]{0,8}支撑/u.test(sentence) ||
-      (/\bsupports?\s+(?:(?:are|is)\s+)?(?:required|needed)\b|\badd\s+supports?\b/i.test(sentence) &&
-        !/\b(?:no|without)\s+supports?\b/i.test(sentence));
+      /\badd\s+supports?\b/i.test(sentence) ||
+      (/\bsupports?\s+(?:(?:are|is)\s+)?(?:required|needed)\b/i.test(sentence) &&
+        !/\b(?:no|without)\s+supports?\s+(?:(?:are|is)\s+)?(?:required|needed)\b/i.test(sentence));
     if (forbiddenSupport) {
       supportsForbidden = true;
       addQuote(quotes, "支撑禁止", sentence);

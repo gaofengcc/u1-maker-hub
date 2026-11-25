@@ -149,6 +149,10 @@ function formatHintNumber(value: number): string {
   return Number.isInteger(value) ? String(value) : value.toFixed(2).replace(/0+$/, "").replace(/\.$/, "");
 }
 
+function formatLayerNumber(value: number): string {
+  return value.toFixed(2);
+}
+
 function hintRangeText(range: { min?: number; max?: number } | undefined, suffix: string): string {
   if (!range) return "";
   const min = range.min;
@@ -275,7 +279,7 @@ export function recommendFromMetrics(metrics: PlateMetrics, model: Recommendatio
         supports: needsSupport ? "auto" : "off", brim, ironing: true, seam: "back", layers: "fixed",
       },
       overrides: {
-        layer_height: formatHintNumber(recommendLayer), outer_wall_speed: tall ? "150" : "180", top_shell_layers: "5", bottom_shell_layers: "4",
+        layer_height: formatLayerNumber(recommendLayer), outer_wall_speed: tall ? "150" : "180", top_shell_layers: "5", bottom_shell_layers: "4",
         ...commonOverrides, ...(bridgeSpeed ? { bridge_speed: "35" } : {}),
         seam_slope_type: "external", seam_slope_conditional: "1",
       },
@@ -288,7 +292,7 @@ export function recommendFromMetrics(metrics: PlateMetrics, model: Recommendatio
         supports: needsSupport ? "auto" : "off", brim, ironing: false, seam: "aligned", layers: "fixed",
       },
       overrides: {
-        layer_height: formatHintNumber(speedLayer), outer_wall_speed: speed, inner_wall_speed: tall ? "180" : "210",
+        layer_height: formatLayerNumber(speedLayer), outer_wall_speed: speed, inner_wall_speed: tall ? "180" : "210",
         top_shell_layers: "4", bottom_shell_layers: "3", support_threshold_angle: String(supportAngle),
         support_top_z_distance: supportGap, support_bottom_z_distance: supportGap, support_interface_top_layers: "3",
         overhang_1_4_speed: "0", overhang_2_4_speed: "50", overhang_3_4_speed: "35", overhang_4_4_speed: "15",
