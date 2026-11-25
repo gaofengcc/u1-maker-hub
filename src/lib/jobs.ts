@@ -32,6 +32,7 @@ export type Job = {
   cover: string;
   mode: PrintMode;
   options: PrintOptions;
+  overrides?: Record<string, string>;
   plate: number;
   /** Size and rotation of the plate; missing on jobs made before resizing existed. */
   transform?: PlateTransform;
@@ -61,7 +62,7 @@ export type Job = {
 export type JobStats = { seconds: number | null; grams: number | null; toolChanges: number | null; gramsByFilament?: number[] };
 export type JobPlate = { gcode: string; project: string; stats: JobStats; remoteName: string | null; started?: boolean };
 
-export type NewJob = Pick<Job, "site" | "designId" | "instanceId" | "snapmaker" | "title" | "cover" | "mode" | "options" | "plate" | "transform" | "items" | "upload" | "filamentToTool" | "send" | "print"> & { source?: SourceId };
+export type NewJob = Pick<Job, "site" | "designId" | "instanceId" | "snapmaker" | "title" | "cover" | "mode" | "options" | "overrides" | "plate" | "transform" | "items" | "upload" | "filamentToTool" | "send" | "print"> & { source?: SourceId };
 
 export type PlateJobItem = Pick<
   PlateEntry,
@@ -317,6 +318,7 @@ async function runJob(job: Job) {
         workDir: path.join(dir, inputs.length > 1 ? `slice-${i + 1}` : "slice"),
         mode: job.mode,
         options: job.options,
+        overrides: job.overrides,
         tools: settings.tools,
         filamentToTool: mapping,
         filamentTypes,
