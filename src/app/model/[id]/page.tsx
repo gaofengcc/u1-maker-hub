@@ -40,7 +40,14 @@ const clean = (html: string) =>
 
 async function ModelContent({ params, searchParams }: PageProps<"/model/[id]">) {
   await connection();
-  const [{ id }, { source }] = await Promise.all([params, searchParams]);
+  const [{ id }, sp] = await Promise.all([params, searchParams]);
+  const source = sp.source;
+  const instanceParam = sp.instance;
+  // 切换打印配置时把 instance 写回地址栏，刷新/分享不丢；其余参数原样保留。
+  const baseQuery = Object.entries(sp)
+    .filter(([key, value]) => key !== "instance" && typeof value === "string")
+    .map(([key, value]) => `${encodeURIComponent(key)}=${encodeURIComponent(value as string)}`)
+    .join("&");
   const settings = publicSettings();
   const site = isSourceId(source) ? siteForSource(source) : settings.site;
   if (!site) {
@@ -97,6 +104,8 @@ async function ModelContent({ params, searchParams }: PageProps<"/model/[id]">) 
         modes={Object.entries(PRINT_MODES).map(([key, m]) => ({ key, label: m.label, description: m.description }))}
         defaults={DEFAULT_OPTIONS}
         filamentPresets={u1Filaments()}
+        initialInstance={Number(instanceParam) || 0}
+        baseQuery={baseQuery}
       />
     </>
   );

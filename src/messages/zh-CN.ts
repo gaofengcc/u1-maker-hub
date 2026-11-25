@@ -94,6 +94,7 @@ const zhCN = {
     allModels: "{source}上的全部模型",
     featured: "Snapmaker Space 精选模型",
     modelCount: "{n} 个模型",
+    modelCountApprox: "约 {n} 个（当前排序可翻到的量，接口单次上限 1 万）",
     sort: "排序",
     uploadedWithin: "上传时间",
     models: "模型",

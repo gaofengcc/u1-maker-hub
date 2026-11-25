@@ -125,7 +125,9 @@ export type PeriodKey = keyof typeof PERIODS;
 
 /** What makerworld.com shows first: All Models opens on Trending over 7 days, a search on Relevance over all time. */
 export function defaultListing(q: string): { sort: SortKey; period: PeriodKey } {
-  return q.trim() ? { sort: "relevance", period: "all" } : { sort: "trending", period: "week" };
+  // 之前空查询默认「热门 · 近7天」，而热门榜只有 487 条，页面却写着「全部模型」。
+  // 改为「下载量 · 不限时间」，同一接口可翻到 1 万条（接口硬上限）。
+  return q.trim() ? { sort: "relevance", period: "all" } : { sort: "downloads", period: "all" };
 }
 
 /** Results per page, as on makerworld.com, so pages line up with the site's. */

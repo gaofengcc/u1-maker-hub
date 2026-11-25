@@ -201,8 +201,18 @@ export function Explore({ source, query: initialQuery, sort, period, sorts, peri
 
       <section style={{ display: "flex", flexWrap: "wrap", justifyContent: "space-between", alignItems: "center", gap: 12 }}>
         <div style={{ display: "flex", flexWrap: "wrap", alignItems: "baseline", gap: 12 }}>
-          <h1 style={{ margin: 0, fontSize: 22 }}>{initialQuery ? `“${initialQuery}”` : site ? t("explore.allModels", { source: sourceName }) : t("explore.featured")}</h1>
-          {total > 0 && <span className="muted small">{t("explore.modelCount", { n: total.toLocaleString() })}</span>}
+          <h1 style={{ margin: 0, fontSize: 22 }}>
+            {initialQuery
+              ? `“${initialQuery}”`
+              : site
+                ? `${sourceName} · ${t(`explore.sorts.${sort}`)}${period === "all" ? "" : ` · ${t(`explore.periods.${period}`)}`}`
+                : t("explore.featured")}
+          </h1>
+          {total > 0 && (
+            <span className="muted small">
+              {t("explore.modelCountApprox", { n: total.toLocaleString() })}
+            </span>
+          )}
           {searching && (total > 0 || (!loading && !error)) && <span className="muted small">{t("explore.searchAllHint", { count: selectedSources.length })}</span>}
         </div>
         {!searching && site && (

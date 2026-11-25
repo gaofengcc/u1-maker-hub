@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import type { Instance, ModelDetail } from "@/lib/makerworld.ts";
 import type { Job } from "@/lib/jobs.ts";
 import type { PrintOptions, ToolLoad } from "@/lib/slicer.ts";
@@ -21,6 +22,10 @@ type Props = {
   modes: Mode[];
   defaults: PrintOptions;
   filamentPresets: string[];
+  /** 地址栏里的 ?instance=，用于刷新/分享后还原选中的打印配置。 */
+  initialInstance?: number;
+  /** 除 instance 之外的原始查询串，切配置时原样保留。 */
+  baseQuery?: string;
 };
 
 /** The filament slots a profile (or one plate of it) uses, numbered like in the 3MF (1-based). */
@@ -37,8 +42,19 @@ function slotsFor(instance: Instance, plate: number): ColorSlot[] {
   return [...bySlot.values()].sort((a, b) => a.slot - b.slot);
 }
 
-export function ModelView({ design, site, settings, modes, defaults, filamentPresets }: Props) {
-  const [instanceId, setInstanceId] = useState(design.instances[0]?.id ?? design.defaultInstanceId);
+export function ModelView({ design, site, settings, modes, defaults, filamentPresets, initialInstance = 0, baseQuery = "" }: Props) {
+  const router = useRouter();
+  // 优先用地址栏里的配置；无效或缺省时回落到第一个（作者默认）配置。
+  const [instanceId, setInstanceId] = useState(
+    () => design.instances.find((i) => Number(i.id) === initialInstance)?.id ?? design.instances[0]?.id ?? design.defaultInstanceId,
+  );
+  const selectInstance = (nextId: number) => {
+    setInstanceId(nextId);
+    const params = new URLSearchParams(baseQuery);
+    params.set("instance", String(nextId));
+    // replace 而不是 push：切配置不该在浏览器历史里堆一长串记录。
+    router.replace(`/model/${design.id}?${params.toString()}`, { scroll: false });
+  };
   const instance = design.instances.find((i) => i.id === instanceId) ?? design.instances[0];
   const [plate, setPlate] = useState(1);
   const creatorSupports = useCreatorSupports(instance ? [{ instanceId: instance.id, site }] : [], settings.loggedIn);
@@ -184,7 +200,7 @@ export function ModelView({ design, site, settings, modes, defaults, filamentPre
                   aria-checked={i.id === instance.id}
                   className="profile"
                   onClick={() => {
-                    setInstanceId(i.id);
+                    selectInstance(i.id);
                     setPlate(1);
                     setPicture(0);
                   }}
