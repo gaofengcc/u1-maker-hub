@@ -3,6 +3,7 @@ import { PAGE_SIZE, search } from "@/lib/makerworld.ts";
 import { SOURCE_IDS, isSourceId, siteForSource, type SourceId } from "@/lib/sites.ts";
 import { searchModels } from "@/lib/snapmaker.ts";
 import { fromMakerWorld, fromSnapmaker, type AggregateResponse, type UnifiedCard } from "@/lib/unified.ts";
+import { demoModelsForQuery } from "@/lib/demoData.ts";
 
 export async function GET(req: NextRequest) {
   const params = req.nextUrl.searchParams;
@@ -13,6 +14,15 @@ export async function GET(req: NextRequest) {
   const activeSources = sources === null
     ? SOURCE_IDS
     : [...new Set(sources.split(",").map((source) => source.trim()).filter(isSourceId))];
+  if (process.env.DEMO_MODE === "1") {
+    const demoItems = demoModelsForQuery(q).map((item) => fromMakerWorld(item, "mw-intl"));
+    return NextResponse.json({
+      total: demoItems.length,
+      items: activeSources.length === 0 ? [] : demoItems,
+      next: {},
+      failures: [],
+    } satisfies AggregateResponse);
+  }
   const rawOffset = Number(params.get("offset"));
   const offset = Number.isSafeInteger(rawOffset) && rawOffset > 0 ? rawOffset : 0;
   const page = Math.floor(offset / PAGE_SIZE) + 1;

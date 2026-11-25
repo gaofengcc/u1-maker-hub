@@ -16,6 +16,7 @@ export async function GET() {
  * The Bambu token is managed by /api/auth/token. An empty Home Assistant token keeps the saved one; null removes it.
  */
 export async function PUT(req: Request) {
+  if (process.env.DEMO_MODE === "1") return NextResponse.json(publicSettings());
   const body = await readJson<{
     printerHost?: string; tools?: ToolLoad[]; haUrl?: string; haToken?: string | null; haPlug?: string; site?: string;
     aiEnabled?: boolean; aiBaseUrl?: string; aiModel?: string; aiKey?: string | null;

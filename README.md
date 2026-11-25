@@ -5,6 +5,9 @@
 > [!WARNING]
 > 🚧 **这个项目是边聊边写出来的（vibe-coded）。** 我用 AI 辅助快速攒起来，给自己和自家打印机用。bug、粗糙的地方、缺失的校验都会有。在我这儿能跑，但没在别的环境上加固和测试过。放出来是希望帮到其他 Snapmaker U1 机主，我也会继续改。欢迎提 issue 和 PR。
 
+> [!TIP]
+> **Docker 一行命令**：`docker run -d --name u1-maker-hub -p 3000:3000 -v u1data:/data ghcr.io/gaofengcc/u1-maker-hub:latest`　[查看快速上手文档](docs/QUICKSTART.md)
+
 **🌍 三个模型站，一个界面，点几下送到你的 Snapmaker U1。**
 
 U1 模型工坊是一个自托管的网页应用：同时浏览 MakerWorld 中国站、MakerWorld 国际站和 Snapmaker Space 国际站，按 U1 的预设重新切片，直接推送到打印机。手机和电脑都能用。
@@ -141,11 +144,11 @@ pnpm mock-printer
 镜像里已经打好 OrcaSlicer，只要有 Docker 就行：
 
 ```bash
-docker compose up -d --build      # http://<宿主机>:3000
+docker compose up -d              # http://<宿主机>:3000
 docker compose logs -f
 ```
 
-设置、令牌、收藏、下载和任务都存在 `u1-data` 卷里。想换 OrcaSlicer 版本，改 `docker-compose.yml` 里的 `ORCA_VERSION` 再重新构建。
+设置、令牌、收藏、下载和任务都存在 `u1-data` 卷里。想从源码构建或更换 OrcaSlicer 版本，请参考 `docker-compose.build.yml`。
 
 ⚠️ 镜像只有 `linux/amd64`，因为 OrcaSlicer 没有发布 ARM 版 Linux 构建。在 ARM 机器上能靠模拟跑，但切片会慢好几倍，**强烈建议用 x86_64 机器**。
 

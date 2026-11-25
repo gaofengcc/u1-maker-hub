@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Suspense } from "react";
+import { connection } from "next/server";
 import { Inter } from "next/font/google";
 import { Header } from "@/components/Header";
 import { ServiceWorker } from "@/components/ServiceWorker";
@@ -35,6 +36,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
         <link rel="dns-prefetch" href="https://makerworld.bblmw.cn" />
       </head>
       <body>
+        <Suspense fallback={null}><DemoBanner /></Suspense>
         <Suspense fallback={<header className="header" style={{ height: 65 }} />}>
           <Header />
         </Suspense>
@@ -46,4 +48,9 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       </body>
     </html>
   );
+}
+
+async function DemoBanner() {
+  await connection();
+  return process.env.DEMO_MODE === "1" ? <div className="demo-banner">演示模式：数据是内置示例，不会连接 MakerWorld 或打印机</div> : null;
 }

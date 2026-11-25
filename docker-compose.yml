@@ -1,13 +1,9 @@
 # U1 Maker Hub with OrcaSlicer bundled.
-#   docker compose up -d --build      then open http://<host>:3000
-# See "Docker" in the README for resource sizing.
+#   docker compose up -d                then open http://<host>:3000
+# See docs/QUICKSTART.md for the pull-and-run command and setup notes.
 services:
   u1-maker-hub:
-    build:
-      context: .
-      args:
-        ORCA_VERSION: "2.4.2"
-    image: u1-maker-hub:latest
+    image: ghcr.io/gaofengcc/u1-maker-hub:latest
     platform: linux/amd64 # OrcaSlicer only ships x86_64 Linux builds
     container_name: u1-maker-hub
     restart: unless-stopped
@@ -15,8 +11,11 @@ services:
     ports:
       - "3000:3000"
     volumes:
-      - u1-data:/data
+      - ${DATA_DIR:-u1-data}:/data
     environment:
+      DATA_DIR: /data
+      MW_MIN_INTERVAL_MS: ${MW_MIN_INTERVAL_MS:-4000}
+      U1_ALLOW_PUBLIC_TARGETS: ${U1_ALLOW_PUBLIC_TARGETS:-}
       TZ: UTC
     deploy:
       resources:

@@ -25,8 +25,19 @@ type PublicSettings = {
 
 type LoginStep = { status: "ok" } | { status: "code"; email: string } | { status: "tfa"; tfaKey: string };
 
-export function SettingsView({ initial, filaments }: { initial: PublicSettings; filaments: string[] }) {
+export function SettingsView({ initial, filaments, demoMode = false }: { initial: PublicSettings; filaments: string[]; demoMode?: boolean }) {
   const [s, setS] = useState(initial);
+  if (demoMode) {
+    return (
+      <main className="container" style={{ maxWidth: 900, display: "flex", flexDirection: "column", gap: 20 }}>
+        <h1 style={{ margin: 0, fontSize: 26 }}>{t("settings.title")}</h1>
+        <section className="panel">
+          <h2 style={{ marginTop: 0 }}>演示模式</h2>
+          <p className="notice" style={{ marginBottom: 0 }}>演示模式下设置不会保存，也不会连接 MakerWorld 或打印机。</p>
+        </section>
+      </main>
+    );
+  }
   return (
     <main className="container" style={{ maxWidth: 900, display: "flex", flexDirection: "column", gap: 20 }}>
       <h1 style={{ margin: 0, fontSize: 26 }}>{t("settings.title")}</h1>
