@@ -3,7 +3,6 @@ import { downloadInstance } from "@/lib/makerworld.ts";
 import { eachTriangle, itemsOnPlate, loadProject } from "@/lib/geometry.ts";
 import { readProject } from "@/lib/threemf.ts";
 import { metricsFromTriangles, recommendFromMetrics, type Triangle } from "@/lib/recommend.ts";
-import { errorResponse } from "@/lib/http.ts";
 import { resolveSite } from "@/lib/sites.ts";
 
 /** 返回当前盘几何指标和按模型形状计算的两套 U1 推荐参数。 */
