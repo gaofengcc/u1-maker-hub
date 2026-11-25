@@ -79,7 +79,12 @@ export async function readProject(file: string): Promise<ProjectInfo> {
   const brimType = stringValue(settings.brim_type);
   const brimWidth = numberValue(settings.brim_width);
   const printer = String(settings.printer_settings_id ?? settings.printer_model ?? "");
-  const creator: CreatorPreset | null = settingsText ? {
+  const hasCreatorSettings = Boolean(settingsText && Object.keys(settings).some((key) => [
+    "layer_height", "wall_loops", "sparse_infill_density", "sparse_infill_pattern", "enable_support",
+    "support_threshold_angle", "brim_type", "brim_width", "ironing_type", "seam_position",
+    "filament_type", "filament_colour", "printer_settings_id", "printer_model",
+  ].includes(key)));
+  const creator: CreatorPreset | null = hasCreatorSettings ? {
     options: {
       ...(infillDensity != null ? { infillDensity } : {}),
       ...(infillPattern && ["gyroid", "grid", "crosshatch", "cubic", "lightning", "honeycomb"].includes(infillPattern) ? { infillPattern: infillPattern as PrintOptions["infillPattern"] } : {}),
