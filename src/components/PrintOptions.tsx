@@ -380,10 +380,12 @@ export function PrintOptionsPanel(props: PrintOptionsPanelProps) {
         <div className="opt-row" style={{ display: "block" }}>
           <div className="opt-text">
             <span className="opt-title">{t("print.modelPresetReadOnly")}</span>
-            <span className="opt-desc">{t("print.modelPresetSummary", { layer: modelPreset?.layerHeight ?? "—", material: modelPreset?.material ?? "—", machine: modelPreset?.machine ?? "—", plates: modelPreset?.plateCount ?? "—" })}</span>
-            <span className="opt-hint">{t("print.modelPresetInfill", { pattern: modelPreset?.infillPattern ?? "—", angle: modelPreset?.supportAngle ?? "—" })}</span>
+            {modelPreset ? <>
+              <span className="opt-desc">{t("print.modelPresetSummary", { layer: modelPreset.layerHeight ?? "—", material: modelPreset.material ?? "—", machine: modelPreset.machine ?? "—", plates: modelPreset.plateCount ?? "—" })}</span>
+              <span className="opt-hint">{t("print.modelPresetInfill", { pattern: modelPreset.infillPattern ?? "—", angle: modelPreset.supportAngle ?? "—" })}</span>
+            </> : <span className="opt-desc">{t("print.modelPresetFallback")}</span>}
           </div>
-          <button type="button" className="btn btn-sm" onClick={() => apply({ ...defaults, ...(modelPreset?.options ?? {}) })}>{t("print.applyCreatorPreset")}</button>
+          {modelPreset && <button type="button" className="btn btn-sm" onClick={() => apply({ ...defaults, ...(modelPreset.options ?? {}) })}>{t("print.applyCreatorPreset")}</button>}
         </div>
       )}
       {active === "recommend" && (

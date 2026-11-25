@@ -290,6 +290,7 @@ const zhCN = {
     tabSpeed: "最快速度",
     tabCustom: "自定义",
     modelPresetReadOnly: "作者原始配置（只读）",
+    modelPresetFallback: "模型未携带作者配置，当前显示生效预设。",
     modelPresetSummary: "层高 {layer} mm · 材料 {material} · 机型 {machine} · {plates} 个打印盘",
     modelPresetInfill: "填充图案 {pattern} · 支撑角度 {angle}°。速度、加速度和温度已按 U1 预设处理。",
     applyCreatorPreset: "按作者配置",

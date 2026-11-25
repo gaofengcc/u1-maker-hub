@@ -1,7 +1,8 @@
 import type { PrintMode, PrintOptions } from "./slicer.ts";
 
 /** 一个世界坐标三角面，按 x,y,z 连续存储三个顶点。 */
-export type Triangle = readonly [number, number, number, number, number, number, number, number, number];
+/** 三角面顶点数组，前三个顶点各含 x/y/z。 */
+export type Triangle = readonly number[];
 
 export type PlateMetrics = {
   bbox: [number, number, number, number, number, number];
@@ -30,7 +31,7 @@ export function metricsFromTriangles(triangles: Iterable<Triangle>): PlateMetric
 
   for (const t of triangles) {
     const [x1, y1, z1, x2, y2, z2, x3, y3, z3] = t;
-    const points = [x1, y1, z1, x2, y2, z2, x3, y3, z3] as Triangle;
+    const points = [x1, y1, z1, x2, y2, z2, x3, y3, z3];
     for (let i = 0; i < 9; i += 3) {
       bbox[0] = Math.min(bbox[0], points[i]);
       bbox[1] = Math.min(bbox[1], points[i + 1]);
