@@ -1,4 +1,5 @@
 import type { PrintMode, PrintOptions } from "./slicer.ts";
+import type { ModelHints } from "./modelHints.ts";
 
 /** 一个世界坐标三角面，按 x,y,z 连续存储三个顶点。 */
 /** 三角面顶点数组，前三个顶点各含 x/y/z。 */
@@ -120,6 +121,7 @@ export function metricsFromTriangles(triangles: Iterable<Triangle>): PlateMetric
 export type RecommendationModel = {
   materialType?: string;
   materialDensity?: number;
+  hints?: ModelHints;
 };
 
 export type RecommendationPreset = {
@@ -129,18 +131,60 @@ export type RecommendationPreset = {
   reasons: string[];
 };
 
-export type Recommendations = { recommend: RecommendationPreset; speed: RecommendationPreset };
+export type Recommendations = {
+  recommend: RecommendationPreset;
+  speed: RecommendationPreset;
+  /** 几何判断与作者说明发生方向冲突时，供接口和 UI 展示。 */
+  hintConflicts?: string[];
+};
+
+function clampHint(value: number, range: { min?: number; max?: number } | undefined): number {
+  if (!range) return value;
+  const min = Number.isFinite(range.min) ? range.min! : -Infinity;
+  const max = Number.isFinite(range.max) ? range.max! : Infinity;
+  return Math.min(max, Math.max(min, value));
+}
+
+function formatHintNumber(value: number): string {
+  return Number.isInteger(value) ? String(value) : value.toFixed(2).replace(/0+$/, "").replace(/\.$/, "");
+}
+
+function hintRangeText(range: { min?: number; max?: number } | undefined, suffix: string): string {
+  if (!range) return "";
+  const min = range.min;
+  const max = range.max;
+  if (min != null && max != null) return `${formatHintNumber(min)}~${formatHintNumber(max)}${suffix}`;
+  if (min != null) return `不低于 ${formatHintNumber(min)}${suffix}`;
+  if (max != null) return `不高于 ${formatHintNumber(max)}${suffix}`;
+  return "";
+}
+
+function supportQuote(hints: ModelHints | undefined, mode: "forbidden" | "required"): string | undefined {
+  if (!hints) return undefined;
+  const quotes = hints.quotes.filter((quote) => /支撑|support/i.test(quote.sentence));
+  const pattern = mode === "forbidden"
+    ? /禁止|不要|不需|无需|不开|关闭|留空|🚫|\bno supports?\b|\bwithout supports?\b|\bnone\b|\boff\b/i
+    : /需要|务必|必须|建议开|\bsupports?\s+(?:are\s+|is\s+)?(?:required|needed)\b|\badd supports?\b/i;
+  return quotes.find((quote) => pattern.test(quote.sentence))?.sentence ?? quotes[0]?.sentence;
+}
 
 /** 按几何特征生成两套 U1 参数。所有原因都带有本次模型的实际数字，便于用户核对。 */
 export function recommendFromMetrics(metrics: PlateMetrics, model: RecommendationModel = {}): Recommendations {
+  const hints = model.hints;
   const overhang = metrics.overhang45Percent;
   const severeOverhang = metrics.overhang60Percent;
   const tall = metrics.heightToBaseRatio >= 4 || (metrics.heightMm >= 100 && metrics.baseAreaMm2 > 0 && metrics.heightToBaseRatio >= 3);
-  const needsSupport = overhang >= 12;
+  const geometryNeedsSupport = overhang >= 12;
+  const needsSupport = hints?.supports === "forbidden" ? false : hints?.supports === "required" ? true : geometryNeedsSupport;
   const supportAngle = severeOverhang >= 8 || overhang >= 25 ? 35 : overhang >= 12 ? 40 : 45;
   const material = (model.materialType ?? "PLA").toUpperCase();
   const supportGap = material === "PETG" || material === "TPU" ? "0.25" : "0.2";
-  const brim = tall || metrics.bedContactAreaMm2 < 250 ? "always" : "auto";
+  const geometryBrim: PrintOptions["brim"] = tall || metrics.bedContactAreaMm2 < 250 ? "always" : "auto";
+  const brim: PrintOptions["brim"] = hints?.brim === "required" ? "always" : hints?.brim === "forbidden" ? "none" : geometryBrim;
+  const recommendLayer = clampHint(0.12, hints?.layerHeight);
+  const speedLayer = clampHint(0.20, hints?.layerHeight);
+  const recommendInfill = clampHint(18, hints?.infill);
+  const speedInfill = clampHint(12, hints?.infill);
   const wallLoops = tall ? 4 : 3;
   const speedWalls = tall ? 2 : 3;
   const speed = tall ? "150" : "190";
@@ -157,7 +201,7 @@ export function recommendFromMetrics(metrics: PlateMetrics, model: Recommendatio
     : null;
 
   const recommendReasons = [
-    `层高 0.12 mm、墙数 ${wallLoops} 圈、填充 18%（gyroid），兼顾细节与强度`,
+    `层高 ${formatHintNumber(recommendLayer)} mm、墙数 ${wallLoops} 圈、填充 ${formatHintNumber(recommendInfill)}%（gyroid），兼顾细节与强度`,
     `${baseText}，高/底宽比 ${metrics.heightToBaseRatio.toFixed(2)} → ${brim === "always" ? "加 5 mm brim" : "使用自动 brim"}`,
     `悬垂专项：${overhangReason}；悬垂段降速 ${speedPair} mm/s`,
   ];
@@ -165,13 +209,51 @@ export function recommendFromMetrics(metrics: PlateMetrics, model: Recommendatio
   if (tall) recommendReasons.push(`细高件高度 ${metrics.heightMm.toFixed(1)} mm、高/底宽比 ${metrics.heightToBaseRatio.toFixed(2)} → 外壁速度降至 ${speed} mm/s`);
 
   const speedReasons = [
-    `层高 0.20 mm、墙数 ${speedWalls} 圈、填充 12%（gyroid），预计比精细档更快`,
+    `层高 ${formatHintNumber(speedLayer)} mm、墙数 ${speedWalls} 圈、填充 ${formatHintNumber(speedInfill)}%（gyroid），预计比精细档更快`,
     `外壁速度 ${speed} mm/s，保留表面稳定性并避免极限速度波纹`,
     `${baseText}，高/底宽比 ${metrics.heightToBaseRatio.toFixed(2)} → ${brim === "always" ? "加 5 mm brim" : "使用自动 brim"}`,
     `悬垂专项：${overhangReason}；悬垂段降速 50/35/15 mm/s`,
   ];
   if (flatReason) speedReasons.push(`悬垂专项：${flatReason}`);
   if (overhang >= 30) speedReasons.push(`悬垂 ${overhang.toFixed(1)}%（>45°）→ 建议改朝向`);
+
+  const hintConflicts: string[] = [];
+  if (hints?.supports === "forbidden") {
+    const quote = supportQuote(hints, "forbidden");
+    const source = quote ? `（原文「${quote}」）` : "";
+    const reason = `作者说明：支撑禁止${source}→ 强制关闭支撑，即使几何指标建议开`;
+    recommendReasons.push(reason);
+    speedReasons.push(reason);
+    if (geometryNeedsSupport) {
+      hintConflicts.push(`几何指标建议开支撑（悬垂 ${overhang.toFixed(1)}%），但作者说明禁止支撑 → 已按作者说明关闭`);
+    }
+  } else if (hints?.supports === "required") {
+    const quote = supportQuote(hints, "required");
+    const source = quote ? `（原文「${quote}」）` : "";
+    const reason = `作者说明：支撑必需${source}→ 强制开启自动支撑`;
+    recommendReasons.push(reason);
+    speedReasons.push(reason);
+    if (!geometryNeedsSupport) {
+      hintConflicts.push(`几何指标未建议开支撑（悬垂 ${overhang.toFixed(1)}%），但作者说明要求支撑 → 已按作者说明开启`);
+    }
+  }
+  if (hints?.layerHeight) {
+    const rangeText = hintRangeText(hints.layerHeight, " mm");
+    const reason = `作者说明：建议层高 ${rangeText} → 层高取 ${formatHintNumber(recommendLayer)} mm（推荐档）/ ${formatHintNumber(speedLayer)} mm（最快档）`;
+    recommendReasons.push(reason);
+    speedReasons.push(reason);
+  }
+  if (hints?.infill) {
+    const rangeText = hintRangeText(hints.infill, "%");
+    const reason = `作者说明：建议填充 ${rangeText} → 填充取 ${formatHintNumber(recommendInfill)}%（推荐档）/ ${formatHintNumber(speedInfill)}%（最快档）`;
+    recommendReasons.push(reason);
+    speedReasons.push(reason);
+  }
+  if (hints?.brim) {
+    const reason = `作者说明：${hints.brim === "required" ? "需要 brim → 强制开启" : "无需 brim → 关闭"}`;
+    recommendReasons.push(reason);
+    speedReasons.push(reason);
+  }
 
   const commonOverrides = {
     support_threshold_angle: String(supportAngle),
@@ -189,11 +271,11 @@ export function recommendFromMetrics(metrics: PlateMetrics, model: Recommendatio
     recommend: {
       mode: "fine",
       options: {
-        infillDensity: 18, infillPattern: "gyroid", wallLoops,
+        infillDensity: recommendInfill, infillPattern: "gyroid", wallLoops,
         supports: needsSupport ? "auto" : "off", brim, ironing: true, seam: "back", layers: "fixed",
       },
       overrides: {
-        layer_height: "0.12", outer_wall_speed: tall ? "150" : "180", top_shell_layers: "5", bottom_shell_layers: "4",
+        layer_height: formatHintNumber(recommendLayer), outer_wall_speed: tall ? "150" : "180", top_shell_layers: "5", bottom_shell_layers: "4",
         ...commonOverrides, ...(bridgeSpeed ? { bridge_speed: "35" } : {}),
         seam_slope_type: "external", seam_slope_conditional: "1",
       },
@@ -202,11 +284,11 @@ export function recommendFromMetrics(metrics: PlateMetrics, model: Recommendatio
     speed: {
       mode: "fast",
       options: {
-        infillDensity: 12, infillPattern: "gyroid", wallLoops: speedWalls,
+        infillDensity: speedInfill, infillPattern: "gyroid", wallLoops: speedWalls,
         supports: needsSupport ? "auto" : "off", brim, ironing: false, seam: "aligned", layers: "fixed",
       },
       overrides: {
-        layer_height: "0.20", outer_wall_speed: speed, inner_wall_speed: tall ? "180" : "210",
+        layer_height: formatHintNumber(speedLayer), outer_wall_speed: speed, inner_wall_speed: tall ? "180" : "210",
         top_shell_layers: "4", bottom_shell_layers: "3", support_threshold_angle: String(supportAngle),
         support_top_z_distance: supportGap, support_bottom_z_distance: supportGap, support_interface_top_layers: "3",
         overhang_1_4_speed: "0", overhang_2_4_speed: "50", overhang_3_4_speed: "35", overhang_4_4_speed: "15",
@@ -214,6 +296,7 @@ export function recommendFromMetrics(metrics: PlateMetrics, model: Recommendatio
       },
       reasons: speedReasons,
     },
+    hintConflicts,
   };
 }
 
