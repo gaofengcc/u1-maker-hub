@@ -1,4 +1,5 @@
 import fs from "node:fs";
+import { checkLanTarget } from "./lanOnly.ts";
 import { readSettings } from "./store.ts";
 
 /**
@@ -15,6 +16,9 @@ export class PrinterError extends Error {
 export function printerBase(host = readSettings().printerHost) {
   if (!host) throw new PrinterError("No printer address set. Add it in Settings.", 400);
   const trimmed = host.trim().replace(/\/+$/, "");
+  // 第二道闸：即使设置被别处写脏，也不把请求发往公网目标（SSRF 防护）。
+  const check = checkLanTarget(trimmed);
+  if (!check.ok) throw new PrinterError(`Printer address rejected: ${check.reason}`, 400);
   return /^https?:\/\//.test(trimmed) ? trimmed : `http://${trimmed}`;
 }
 

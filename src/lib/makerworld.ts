@@ -2,6 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { DOWNLOAD_DIR, accountOf, writeAccount, clearAccount } from "./store.ts";
 import { resolveSite, siteConfig, type SiteId } from "./sites.ts";
+import { beforeDownload, noteCaptcha } from "./makerGate.ts";
 
 /**
  * Client for MakerWorld's web API (reverse-engineered, unofficial).
@@ -358,12 +359,15 @@ export async function downloadInstance(instanceId: number, site?: SiteId): Promi
     return { file, name: meta.name, cached: true };
   }
   const token = requireToken(selectedSite);
+  // 限速 + 冷却：批量抓取会触发 MakerWorld 的 geetest 风控（实测 HTTP 418）。
+  await beforeDownload();
   // 设计 id 与配置 id 是两套编号：拿设计 id 调实例接口会被回「客户端没有访问内容的权限」。
   // 这种情况解析出该设计的默认配置再试一次（真实案例：2980076 → 3571453）。
   let link: { name?: string; url?: string } | null = null;
   try {
     link = await call<{ name?: string; url?: string }>(`/v1/design-service/instance/${instanceId}/f3mf?type=download`, { token }, selectedSite);
   } catch (err) {
+    if (err instanceof MakerWorldError && err.code === "captcha") noteCaptcha();
     const target = await resolveDownloadTarget(instanceId, selectedSite);
     if (target.instanceId === instanceId) throw err;
     link = await call<{ name?: string; url?: string }>(`/v1/design-service/instance/${target.instanceId}/f3mf?type=download`, { token }, selectedSite);

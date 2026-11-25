@@ -212,6 +212,36 @@ Local data lives in `./data`, which git ignores: the token in `settings.json` wi
 - 🔑 **Snapmaker token expired**: the refresh token in `data/snapmaker-auth.json` is dead. Sign out of `space.snapmaker.com` and sign back in, then paste a fresh pair — reloading the page does not refresh the cookies
 - 🔪 **A Snapmaker model fails to slice**: if the log shows `return -100` or `Not a variable name`, it carries conditional G-code the app could not rewrite. Open an issue with the model id
 
+## 🛡️ Safety and rate limiting
+
+### One account, one installation
+
+This app stores your MakerWorld / Snapmaker Space token locally and sends every request as you.
+Keep it personal: **do not publish it as a multi-user service** — that turns one account into the
+access path for many people, breaks the site's terms, and gets that account rate-limited first.
+
+### Built-in throttling (measured, not guessed)
+
+Measured: after downloading 50 models in 20 minutes (20–35 MB each), MakerWorld started answering
+`HTTP 418` with a geetest challenge; the block cleared after about two hours. Downloads are therefore
+serialised with a minimum interval:
+
+| Environment variable | Default | Effect |
+| --- | --- | --- |
+| `MW_MIN_INTERVAL_MS` | `4000` | Minimum gap between two downloads (ms) |
+| `MW_CAPTCHA_COOLDOWN_MS` | `1800000` | Pause after a captcha hit (30 min) |
+
+After a captcha hit the app stops rather than retrying, and reports a cooldown. Solve the challenge
+once in a browser at makerworld.com, or wait it out.
+
+### LAN targets only
+
+The printer and Home Assistant addresses are requested by the server, so only
+`10/8`, `172.16/12`, `192.168/16`, `127/8`, `169.254/16`, `.local` names and single-label hostnames
+are accepted. Public targets are rejected to keep a public deployment from becoming an SSRF pivot.
+Set `U1_ALLOW_PUBLIC_TARGETS=1` if you really need a public device — that hands the protection
+back to your network setup.
+
 ## ⚠️ Caveats
 
 - MakerWorld has no public API. The endpoints used here are reverse-engineered and can break at any time

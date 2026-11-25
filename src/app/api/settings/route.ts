@@ -5,6 +5,7 @@ import type { ToolLoad } from "@/lib/slicer.ts";
 import { DEFAULT_PRICE_PER_KG } from "@/lib/format.ts";
 import { isPlugRef } from "@/lib/homeassistant.ts";
 import { resolveSite } from "@/lib/sites.ts";
+import { checkLanTarget } from "@/lib/lanOnly.ts";
 
 export async function GET() {
   return NextResponse.json(publicSettings());
@@ -25,12 +26,21 @@ export async function PUT(req: Request) {
     if (host && !/^(https?:\/\/)?[\w.-]+(:\d+)?\/?$/.test(host)) {
       return NextResponse.json({ error: "Use an address like 192.168.1.42 or u1.local:7125." }, { status: 400 });
     }
+    // 服务端会主动去请求这个地址，因此只允许局域网目标，避免被当成 SSRF 跳板。
+    if (host) {
+      const check = checkLanTarget(host);
+      if (!check.ok) return NextResponse.json({ error: `Printer address rejected: ${check.reason}` }, { status: 400 });
+    }
     patch.printerHost = host;
   }
   if (typeof body.haUrl === "string") {
     const url = body.haUrl.trim().replace(/\/+$/, "");
     if (url && !/^https?:\/\/[\w.-]+(:\d+)?$/.test(url)) {
       return NextResponse.json({ error: "Use a Home Assistant address like http://homeassistant.local:8123." }, { status: 400 });
+    }
+    if (url) {
+      const check = checkLanTarget(url);
+      if (!check.ok) return NextResponse.json({ error: `Home Assistant address rejected: ${check.reason}` }, { status: 400 });
     }
     patch.haUrl = url;
   }
