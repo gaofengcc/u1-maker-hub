@@ -35,7 +35,9 @@ const middleDown: Triangle = [0, 0, 5, 0, 20, 5, 20, 0, 5];
 const bedDown: Triangle = [0, 0, 0, 0, 20, 0, 20, 0, 0];
 const horizontal = metricsFromTriangles([middleDown, bedDown]);
 if (!(horizontal.overhang45Percent > 0)) throw new Error(`中腰水平朝下面未计入悬垂 ${horizontal.overhang45Percent}`);
-if (horizontal.bedContactAreaMm2 <= 0) throw new Error(`最低处水平朝下面未识别贴床面 ${horizontal.bedContactAreaMm2}`);
+const bedOnly = metricsFromTriangles([bedDown]);
+if (bedOnly.overhang45Percent !== 0) throw new Error(`最低处水平朝下面不应计入悬垂 ${bedOnly.overhang45Percent}`);
+if (bedOnly.bedContactAreaMm2 <= 0) throw new Error(`最低处水平朝下面未识别贴床面 ${bedOnly.bedContactAreaMm2}`);
 const expectedArea = Math.hypot(20, 20) * 20 / 2;
 if (Math.abs(slope.surfaceAreaMm2 - expectedArea) > 1e-6) throw new Error("斜面面积不一致");
 
@@ -53,6 +55,6 @@ if (tallRec.recommend.options.wallLoops === flatRec.recommend.options.wallLoops)
 console.log("verify-recommend: PASS");
 console.log(`cube volume=${box.volumeMm3} surface=${box.surfaceAreaMm2} overhang45=${box.overhang45Percent}% bed=${box.bedContactAreaMm2}`);
 console.log(`slope45 overhang45=${slope.overhang45Percent.toFixed(2)}% area=${slope.surfaceAreaMm2.toFixed(2)}`);
-console.log(`horizontal overhang45=${horizontal.overhang45Percent.toFixed(2)}% bed=${horizontal.bedContactAreaMm2.toFixed(2)}`);
+console.log(`horizontal overhang45=${horizontal.overhang45Percent.toFixed(2)}% bed=${bedOnly.bedContactAreaMm2.toFixed(2)}`);
 console.log(`tall brim=${tallRec.recommend.options.brim} speed=${tallRec.recommend.overrides.outer_wall_speed} walls=${tallRec.recommend.options.wallLoops}`);
 console.log(`flat brim=${flatRec.recommend.options.brim} speed=${flatRec.recommend.overrides.outer_wall_speed} walls=${flatRec.recommend.options.wallLoops}`);

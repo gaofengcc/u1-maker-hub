@@ -240,6 +240,7 @@ export function UploadView({ settings, modes, defaults, initialId }: Props) {
               title: upload.name,
               mode: s.mode,
               options: s.options,
+              overrides: s.overrides,
               plate: s.plate,
               transform: s.transform,
               filamentToTool: s.filamentToTool,

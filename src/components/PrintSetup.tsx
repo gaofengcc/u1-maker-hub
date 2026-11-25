@@ -35,6 +35,7 @@ export type Check = { level: CheckLevel; title: string; detail: string };
 export type Setup = {
   mode: string;
   options: PrintOptions;
+  overrides?: Record<string, string>;
   plate: number;
   transform: { scale: number; rotation: number; orient?: Orient };
   filamentToTool: number[];
@@ -97,6 +98,7 @@ export function shortPreset(p: string) {
 export function PrintSetup(props: Props) {
   const { settings, modes, defaults, sourceKey, plates, plate, onPlate, slots, filamentCount, estimate } = props;
   const [mode, setMode] = useState(modes[0]?.key ?? "fast");
+  const [processOverrides, setProcessOverrides] = useState<Record<string, string>>({});
   const [baseOptions, setOptions] = useState<PrintOptions>(defaults);
   // The U1 settings replace the creator's, so supports start from what the creator used.
   const supportsOption = useSupportsOption(baseOptions, setOptions, props.creatorSupports, defaults);
@@ -117,6 +119,7 @@ export function PrintSetup(props: Props) {
   // Another model starts over; another plate of it holds other pieces, so they start as in the file.
   const [seen, setSeen] = useState({ sourceKey, plate });
   if (seen.sourceKey !== sourceKey || seen.plate !== plate) {
+    setProcessOverrides({});
     if (seen.sourceKey !== sourceKey) {
       setOverrides({});
       setSize(100);
@@ -179,6 +182,7 @@ export function PrintSetup(props: Props) {
   const setup = (p: number, shown: boolean): Setup => ({
     mode,
     options,
+    overrides: processOverrides,
     plate: p,
     transform: { scale: size / 100, rotation: shown ? rotation : 0, orient: shown ? orient : undefined },
     filamentToTool,
@@ -242,6 +246,8 @@ export function PrintSetup(props: Props) {
             plate={plate}
             site={props.site}
             modelPreset={props.modelPreset}
+            onOverridesChange={setProcessOverrides}
+            onPresetMode={setMode}
           />
         </div>
         {props.footer}

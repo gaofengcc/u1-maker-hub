@@ -252,6 +252,7 @@ export function ModelView({ design, site, settings, modes, defaults, filamentPre
               cover: design.cover,
               mode: s.mode,
               options: s.options,
+              overrides: s.overrides,
               plate: printedPlate,
               transform: s.transform,
               filamentToTool: s.filamentToTool,

@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { PRINT_MODES, type PrintOptions as Options } from "@/lib/slicer.ts";
+import type { PrintOptions as Options } from "@/lib/slicer.ts";
+import { PRINT_MODE_LAYER_HEIGHTS } from "@/lib/printModeMetadata.ts";
 import { t } from "@/lib/i18n";
 import { api, duration } from "@/lib/format";
 
@@ -34,6 +35,8 @@ export type PrintOptionsPanelProps = {
   site?: string;
   modelPreset?: ModelPreset | null;
   recommendations?: { recommend?: RecommendationPreset; speed?: RecommendationPreset } | null;
+  onOverridesChange?: (overrides: Record<string, string>) => void;
+  onPresetMode?: (mode: string) => void;
 };
 
 type MetricsLike = {
@@ -283,7 +286,7 @@ type TabKey = "model" | "recommend" | "speed" | "custom";
 
 /** 四档打印参数面板。旧调用方不传模型信息时，推荐档使用当前默认值并保持可用。 */
 export function PrintOptionsPanel(props: PrintOptionsPanelProps) {
-  const { value, defaults, onChange, creatorSupports = null, instanceId, plate = 1, site, modelPreset } = props;
+  const { value, defaults, onChange, creatorSupports = null, instanceId, plate = 1, site, modelPreset, onOverridesChange, onPresetMode } = props;
   const [active, setActive] = useState<TabKey>("recommend");
   const [loaded, setLoaded] = useState<PrintOptionsPanelProps["recommendations"]>(props.recommendations ?? null);
   const [creatorPreset, setCreatorPreset] = useState<ModelPreset | null>(props.modelPreset ?? null);
@@ -330,10 +333,10 @@ export function PrintOptionsPanel(props: PrintOptionsPanelProps) {
   const recOptions = useMemo(() => presetOptions(defaults, recommend), [defaults, recommend]);
   const speedOptions = useMemo(() => presetOptions(defaults, speed), [defaults, speed]);
   const rough: Record<string, EstimateValue | null> = {
-    recommend: recommend?.estimate ?? roughEstimate(metrics, recOptions, PRINT_MODES.fine.layerHeight),
-    speed: speed?.estimate ?? roughEstimate(metrics, speedOptions, PRINT_MODES.fast.layerHeight),
-    model: roughEstimate(metrics, { ...defaults, ...(creatorPreset?.options ?? modelPreset?.options ?? {}) }, creatorPreset?.layerHeight ?? modelPreset?.layerHeight ?? PRINT_MODES.standard.layerHeight),
-    custom: roughEstimate(metrics, value, PRINT_MODES.standard.layerHeight),
+    recommend: recommend?.estimate ?? roughEstimate(metrics, recOptions, PRINT_MODE_LAYER_HEIGHTS.fine),
+    speed: speed?.estimate ?? roughEstimate(metrics, speedOptions, PRINT_MODE_LAYER_HEIGHTS.fast),
+    model: roughEstimate(metrics, { ...defaults, ...(creatorPreset?.options ?? modelPreset?.options ?? {}) }, creatorPreset?.layerHeight ?? modelPreset?.layerHeight ?? PRINT_MODE_LAYER_HEIGHTS.standard),
+    custom: roughEstimate(metrics, value, PRINT_MODE_LAYER_HEIGHTS.standard),
   };
 
   const apply = (next: Options) => onChange(next);
@@ -354,7 +357,8 @@ export function PrintOptionsPanel(props: PrintOptionsPanelProps) {
     await Promise.all(
       plans.map(async ([key, , options]) => {
         try {
-          const result = await api<EstimateValue>("/api/estimate", { method: "POST", body: JSON.stringify({ instanceId, plate, site, mode: key === "speed" ? "fast" : key === "recommend" ? "fine" : "standard", options, exact: true }) });
+          const preset = key === "speed" ? speed : key === "recommend" ? recommend : undefined;
+          const result = await api<EstimateValue>("/api/estimate", { method: "POST", body: JSON.stringify({ instanceId, plate, site, mode: key === "speed" ? "fast" : key === "recommend" ? "fine" : "standard", options, overrides: preset?.overrides ?? {}, exact: true }) });
           setExact((prev) => ({ ...prev, [key]: result }));
           setExactState((prev) => ({ ...prev, [key]: "done" }));
         } catch (e) {
@@ -412,7 +416,7 @@ export function PrintOptionsPanel(props: PrintOptionsPanelProps) {
         <div>
           <div className="opt-row" style={{ display: "block" }}>
             <div className="opt-text"><span className="opt-title">{t("print.recommendTitle")}</span><span className="opt-desc">{(recommend?.reasons ?? [t("print.recommendFallback")]).join("；")}</span></div>
-            <button type="button" className="btn btn-sm" onClick={() => apply(recOptions)}>{t("print.usePreset")}</button>
+            <button type="button" className="btn btn-sm" onClick={() => { apply(recOptions); onOverridesChange?.(recommend?.overrides ?? {}); if (recommend?.mode) onPresetMode?.(recommend.mode); }}>{t("print.usePreset")}</button>
           </div>
           <Estimate value={exact.recommend ?? rough.recommend} exact={Boolean(exact.recommend)} />
         </div>
@@ -421,7 +425,7 @@ export function PrintOptionsPanel(props: PrintOptionsPanelProps) {
         <div>
           <div className="opt-row" style={{ display: "block" }}>
             <div className="opt-text"><span className="opt-title">{t("print.speedTitle")}</span><span className="opt-desc">{(speed?.reasons ?? [t("print.speedFallback")]).join("；")}</span></div>
-            <button type="button" className="btn btn-sm" onClick={() => apply(speedOptions)}>{t("print.usePreset")}</button>
+            <button type="button" className="btn btn-sm" onClick={() => { apply(speedOptions); onOverridesChange?.(speed?.overrides ?? {}); if (speed?.mode) onPresetMode?.(speed.mode); }}>{t("print.usePreset")}</button>
           </div>
           <Estimate value={exact.speed ?? rough.speed} exact={Boolean(exact.speed)} />
         </div>

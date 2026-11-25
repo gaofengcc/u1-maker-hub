@@ -8,6 +8,7 @@ import { isIdentity, NO_TRANSFORM, type PlateTransform } from "./geometry.ts";
 import { parseStl, stlTo3mf, writeTransformedStl } from "./stl.ts";
 import { isNoOrient } from "./orient.ts";
 import { addLayerHeights, layersApplied, type LayerLimits, type LayerPlan } from "./layerHeights.ts";
+import { PRINT_MODE_LAYER_HEIGHTS } from "./printModeMetadata.ts";
 
 /**
  * Changes to the printer preset for every print. The stock "Auto Lift" picks a spiral lift, which the U1
@@ -39,18 +40,21 @@ export const PRINT_MODES = {
     label: "Fast & clean",
     description: "0.20 mm layers, walls at 210 mm/s to avoid surface ripples, gyroid infill.",
     process: "0.20 Standard @Snapmaker U1 (0.4 nozzle)",
+    layerHeight: PRINT_MODE_LAYER_HEIGHTS.fast,
     overrides: { outer_wall_speed: "210", inner_wall_speed: "210" } as Record<string, string>,
   },
   standard: {
     label: "Standard",
     description: "The official Snapmaker 0.20 mm profile, with a slower first layer and safer travel.",
     process: "0.20 Standard @Snapmaker U1 (0.4 nozzle)",
+    layerHeight: PRINT_MODE_LAYER_HEIGHTS.standard,
     overrides: {} as Record<string, string>,
   },
   fine: {
     label: "Fine detail",
     description: "Official 0.12 mm profile with hidden seams. Smoother curves, about twice as long.",
     process: "0.12 Fine @Snapmaker U1 (0.4 nozzle)",
+    layerHeight: PRINT_MODE_LAYER_HEIGHTS.fine,
     // Scarf seams on the outer wall, only where the seam would otherwise show on a smooth curve.
     overrides: { seam_slope_type: "external", seam_slope_conditional: "1" } as Record<string, string>,
   },
@@ -140,6 +144,8 @@ export type SliceRequest = {
   filamentToTool: number[];
   /** 模型每个耗材槽要求的材料类型（与 filamentToTool 同长度）。 */
   filamentTypes: string[];
+  /** 推荐或调用方指定的切片参数，优先级高于档位预设、低于用户可见选项。 */
+  overrides?: Record<string, string>;
   plate?: number; // 0 = all plates
   /** Resize and rotate the plate as one piece. */
   transform?: PlateTransform;
@@ -263,7 +269,7 @@ export async function sliceForU1(req: SliceRequest): Promise<SliceResult> {
   const machine = flattenPreset(U1_MACHINE);
   for (const [key, value] of Object.entries(RELIABILITY_MACHINE)) setKey(machine, key, value);
   const process = flattenPreset(mode.process);
-  const overrides = { ...RELIABILITY_PROCESS, ...mode.overrides, ...optionsToOverrides(req.options) };
+  const overrides = { ...RELIABILITY_PROCESS, ...mode.overrides, ...(req.overrides ?? {}), ...optionsToOverrides(req.options) };
   for (const [key, value] of Object.entries(overrides)) setKey(process, key, value);
   const limits = layerLimits(req.options, process, machine);
   let plan: LayerPlan | null = null;

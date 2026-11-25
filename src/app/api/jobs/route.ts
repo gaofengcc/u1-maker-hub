@@ -20,6 +20,7 @@ type Body = {
   cover?: string;
   mode?: string;
   options?: Partial<PrintOptions>;
+  overrides?: Record<string, string>;
   plate?: number;
   transform?: { scale?: number; rotation?: number; orient?: unknown };
   filamentToTool?: number[];
@@ -77,6 +78,7 @@ export async function POST(req: Request) {
       cover: String(b.cover ?? ""),
       mode,
       options: { ...DEFAULT_OPTIONS, ...(b.options ?? {}) },
+      overrides: b.overrides,
       plate,
       transform: cleanTransform(b.transform),
       filamentToTool: Array.isArray(b.filamentToTool) ? b.filamentToTool.map(Number) : [],

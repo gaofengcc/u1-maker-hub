@@ -22,9 +22,10 @@ type EstimateBody = {
   options?: Partial<PrintOptions>;
   exact?: boolean;
   site?: string;
+  overrides?: Record<string, string>;
 };
 
-type Estimate = { seconds: number | null; grams: number | null; errorNote?: string };
+type Estimate = { seconds: number | null; grams: number | null; gramsSource?: "gcode" | "derived"; errorNote?: string };
 
 /** 预计时间和耗材。exact=false 只做几何计算，exact=true 使用 U1 OrcaSlicer 真切。 */
 export async function POST(req: NextRequest) {
@@ -40,15 +41,16 @@ export async function POST(req: NextRequest) {
     const { file } = await downloadInstance(instanceId, site);
     const [project, info] = await Promise.all([loadProject(file), readProject(file)]);
     const triangles: Triangle[] = [];
-    for (const item of itemsOnPlate(project, plate)) eachTriangle(project, item, (triangle) => triangles.push(triangle));
+    for (const item of itemsOnPlate(project, plate)) eachTriangle(project, item, (triangle) => triangles.push(triangle.slice()));
     const metrics = metricsFromTriangles(triangles);
     const material = info.filaments[0]?.type ?? "PLA";
-    const rough = roughEstimate(metrics, options, material, Math.max(0, info.filaments.length - 1));
+    const rough = roughEstimate(metrics, options, material, Math.max(0, info.filaments.length - 1), PRINT_MODES[mode].layerHeight);
     if (!body.exact) {
       return NextResponse.json({ exact: false, cached: false, estimate: rough, seconds: rough.seconds, grams: rough.grams, errorNote: ERROR_NOTE });
     }
 
-    const hash = parameterHash(instanceId, plate, mode, options);
+    const overrides = normalizeOverrides(body.overrides);
+    const hash = parameterHash(instanceId, plate, mode, options, overrides);
     const cached = readCache()[hash];
     if (cached) return NextResponse.json({ exact: true, cached: true, ...cached });
 
@@ -64,6 +66,7 @@ export async function POST(req: NextRequest) {
         workDir,
         mode,
         options,
+        overrides,
         tools: settings.tools,
         filamentToTool: mapping,
         filamentTypes: info.filaments.map((f) => f.type),
@@ -73,6 +76,7 @@ export async function POST(req: NextRequest) {
       const exactResult: Estimate = {
         seconds: stats.every((s) => s.seconds != null) ? stats.reduce((n, s) => n + (s.seconds ?? 0), 0) : null,
         grams: stats.every((s) => s.grams != null) ? stats.reduce((n, s) => n + (s.grams ?? 0), 0) : null,
+        gramsSource: stats.some((s) => s.gramsSource === "derived") ? "derived" : "gcode",
       };
       writeCache(hash, exactResult);
       return NextResponse.json({ exact: true, cached: false, ...exactResult, filamentSlots: used.length });
@@ -99,8 +103,13 @@ function normalizeOptions(input: Partial<PrintOptions> | undefined): PrintOption
   };
 }
 
-function parameterHash(instanceId: number, plate: number, mode: PrintMode, options: PrintOptions) {
-  return crypto.createHash("sha256").update(JSON.stringify({ instanceId, plate, mode, options })).digest("hex");
+function normalizeOverrides(input: Record<string, string> | undefined) {
+  if (!input || typeof input !== "object" || Array.isArray(input)) return {};
+  return Object.fromEntries(Object.entries(input).filter(([key, value]) => /^[a-zA-Z0-9_.-]+$/.test(key) && typeof value === "string").map(([key, value]) => [key, value.slice(0, 200)]));
+}
+
+function parameterHash(instanceId: number, plate: number, mode: PrintMode, options: PrintOptions, overrides: Record<string, string>) {
+  return crypto.createHash("sha256").update(JSON.stringify({ instanceId, plate, mode, options, overrides })).digest("hex");
 }
 
 function readCache(): Record<string, Estimate> {
@@ -118,11 +127,18 @@ function writeCache(key: string, value: Estimate) {
 
 function readGcodeStats(file: string): Estimate {
   const text = fs.readFileSync(file, "utf8");
-  const tail = text.slice(-80000);
-  const grams = Number(/(?:total )?filament used \[g\] = ([\d.]+)/i.exec(tail)?.[1] ?? NaN);
-  const duration = /estimated printing time \(normal mode\) = ([^\r\n]+)/i.exec(tail)?.[1] ?? "";
+  const gramsMatch = /total filament used \[g\] = ([^\r\n]+)/i.exec(text) ?? /(?:^|;) filament used \[g\] = ([^\r\n]+)/im.exec(text);
+  const gramsValues = gramsMatch?.[1].split(",").map((v) => Number(v.trim())).filter(Number.isFinite) ?? [];
+  const totalGrams = gramsValues.length > 1 ? gramsValues.reduce((n, value) => n + value, 0) : Number(gramsValues[0]);
+  const density = /filament_density\s*[:=]\s*([^\r\n]+)/i.exec(text)?.[1].split(",").map((v) => Number(v.trim())) ?? [];
+  const mmMatch = /filament used \[mm\] = ([^\r\n]+)/i.exec(text);
+  const mmValues = mmMatch?.[1].split(",").map((v) => Number(v.trim())).filter(Number.isFinite) ?? [];
+  const derived = mmValues.length ? mmValues.reduce((sum, mm, i) => sum + mm * 2.4053 * (density[i] > 0 ? density[i] : density[0] > 0 ? density[0] : 1.24) / 1000, 0) : NaN;
+  const useDerived = !(totalGrams > 0);
+  const grams = useDerived ? derived : totalGrams;
+  const duration = /estimated printing time \(normal mode\) = ([^\r\n]+)/i.exec(text)?.[1] ?? "";
   const seconds = parseDuration(duration);
-  return { seconds: Number.isFinite(seconds) ? seconds : null, grams: Number.isFinite(grams) ? grams : null };
+  return { seconds: Number.isFinite(seconds) ? seconds : null, grams: Number.isFinite(grams) ? grams : null, gramsSource: useDerived ? "derived" : "gcode" };
 }
 
 function parseDuration(value: string) {
