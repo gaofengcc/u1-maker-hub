@@ -5,6 +5,7 @@ import type { PrintOptions as Options } from "@/lib/slicer.ts";
 import { PRINT_MODE_LAYER_HEIGHTS } from "@/lib/printModeMetadata.ts";
 import { t } from "@/lib/i18n";
 import { api, duration } from "@/lib/format";
+import type { ModelHints } from "@/lib/modelHints.ts";
 
 export type EstimateValue = { seconds?: number; grams?: number; cached?: boolean };
 export type RecommendationPreset = {
@@ -35,6 +36,8 @@ export type PrintOptionsPanelProps = {
   site?: string;
   modelPreset?: ModelPreset | null;
   recommendations?: { recommend?: RecommendationPreset; speed?: RecommendationPreset } | null;
+  hints?: ModelHints | null;
+  hintConflicts?: string[];
   onOverridesChange?: (overrides: Record<string, string>) => void;
   onPresetMode?: (mode: string) => void;
 };
@@ -348,19 +351,25 @@ export function PrintOptionsPanel(props: PrintOptionsPanelProps) {
   const [exactState, setExactState] = useState<Record<string, "idle" | "running" | "done" | "error">>({});
   const [exactErrors, setExactErrors] = useState<Record<string, string>>({});
   const [error, setError] = useState<string | null>(null);
+  const [hints, setHints] = useState<ModelHints | null>(props.hints ?? null);
+  const [hintConflicts, setHintConflicts] = useState<string[]>(props.hintConflicts ?? []);
 
   useEffect(() => {
     setLoaded(props.recommendations ?? null);
     setCreatorPreset(props.modelPreset ?? null);
+    setHints(props.hints ?? null);
+    setHintConflicts(props.hintConflicts ?? []);
     if (!instanceId) {
       setMetrics(null);
       return;
     }
     let alive = true;
-    api<{ metrics?: MetricsLike; presets?: PrintOptionsPanelProps["recommendations"]; creator?: { options?: Partial<Options>; layerHeight?: number | null; infillPattern?: string | null; supportAngle?: number | null; materialTypes?: string[]; materialColors?: string[]; printer?: string; plateCount?: number } | null }>(`/api/recommend/${encodeURIComponent(instanceId)}?plate=${plate}${site ? `&site=${encodeURIComponent(site)}` : ""}`)
+    api<{ metrics?: MetricsLike; presets?: PrintOptionsPanelProps["recommendations"]; hints?: ModelHints; hintConflicts?: string[]; creator?: { options?: Partial<Options>; layerHeight?: number | null; infillPattern?: string | null; supportAngle?: number | null; materialTypes?: string[]; materialColors?: string[]; printer?: string; plateCount?: number } | null }>(`/api/recommend/${encodeURIComponent(instanceId)}?plate=${plate}${site ? `&site=${encodeURIComponent(site)}` : ""}`)
       .then((result) => {
         if (!alive) return;
         setMetrics(result.metrics ?? null);
+        setHints(result.hints ?? null);
+        setHintConflicts(result.hintConflicts ?? []);
         if (result.presets) setLoaded(result.presets);
         if (result.creator) setCreatorPreset({
           options: result.creator.options,
@@ -444,6 +453,25 @@ export function PrintOptionsPanel(props: PrintOptionsPanelProps) {
           <button type="button" className="btn btn-sm" onClick={exactCompare}>{t("print.exactCompare")}</button>
         </div>
       </div>
+
+      {hints?.quotes?.length ? (
+        <section aria-labelledby="author-hints" style={{ marginBottom: 10 }}>
+          <h3 id="author-hints" style={{ margin: "4px 0 8px", fontSize: 15 }}>{t("print.authorHintsTitle")}</h3>
+          <div style={{ display: "grid", gap: 6 }}>
+            {hints.quotes.map((quote, index) => (
+              <details key={`${quote.label}-${index}`} open={index < 3} style={{ borderLeft: "3px solid var(--border, #cbd5e1)", background: "var(--surface-muted, #f3f4f6)", padding: "6px 10px" }}>
+                <summary style={{ cursor: "pointer", fontWeight: 600 }}>{quote.label}</summary>
+                <div className="small muted" style={{ marginTop: 4 }}>{quote.sentence}</div>
+              </details>
+            ))}
+          </div>
+          {hintConflicts.map((conflict, index) => <div key={`${conflict}-${index}`} className="notice small" role="status" style={{ marginTop: 6, background: "#fff7d6", borderColor: "#eab308" }}>{conflict}</div>)}
+        </section>
+      ) : hintConflicts.length > 0 ? (
+        <section aria-label={t("print.authorHintsTitle")} style={{ marginBottom: 10 }}>
+          {hintConflicts.map((conflict, index) => <div key={`${conflict}-${index}`} className="notice small" role="status" style={{ background: "#fff7d6", borderColor: "#eab308" }}>{conflict}</div>)}
+        </section>
+      ) : null}
 
       <div role="tablist" aria-label={t("print.parameterTabs")} style={{ display: "flex", gap: 6, overflowX: "auto", paddingBottom: 8 }}>
         {tabs.map(([key, label]) => (

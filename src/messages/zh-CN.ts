@@ -199,6 +199,7 @@ const zhCN = {
     reset: "重置",
     fineTune: "微调本次打印",
     fineTuneDescription: "这里是最常调整的设置，并附有通俗说明。不确定时保持默认即可，预设已经为你做好了平衡。",
+    authorHintsTitle: "作者说明要点",
     strength: "强度",
     printSuccess: "打印成功率",
     looks: "外观",
