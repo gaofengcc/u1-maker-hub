@@ -193,6 +193,7 @@ export function recommendFromMetrics(metrics: PlateMetrics, model: Recommendatio
   const speedWalls = tall ? 2 : 3;
   const speed = tall ? "150" : "190";
   const baseText = `贴床面 ${metrics.bedContactAreaMm2.toFixed(1)} mm²且高度 ${metrics.heightMm.toFixed(1)} mm`;
+  const brimReason = brim === "always" ? "加 5 mm brim" : brim === "none" ? "不加 brim" : "使用自动 brim";
   // 大平悬空（顶棚/桥面）只认 bridge_speed，实测 Orca 对这类面不套用悬垂分段降速。
   const flatRoof = metrics.flatOverhangMm2;
   const bridgeSpeed = flatRoof >= 300 ? "35" : null;
@@ -206,7 +207,7 @@ export function recommendFromMetrics(metrics: PlateMetrics, model: Recommendatio
 
   const recommendReasons = [
     `层高 ${formatHintNumber(recommendLayer)} mm、墙数 ${wallLoops} 圈、填充 ${formatHintNumber(recommendInfill)}%（gyroid），兼顾细节与强度`,
-    `${baseText}，高/底宽比 ${metrics.heightToBaseRatio.toFixed(2)} → ${brim === "always" ? "加 5 mm brim" : "使用自动 brim"}`,
+    `${baseText}，高/底宽比 ${metrics.heightToBaseRatio.toFixed(2)} → ${brimReason}`,
     `悬垂专项：${overhangReason}；悬垂段降速 ${speedPair} mm/s`,
   ];
   if (flatReason) recommendReasons.push(`悬垂专项：${flatReason}`);
@@ -215,7 +216,7 @@ export function recommendFromMetrics(metrics: PlateMetrics, model: Recommendatio
   const speedReasons = [
     `层高 ${formatHintNumber(speedLayer)} mm、墙数 ${speedWalls} 圈、填充 ${formatHintNumber(speedInfill)}%（gyroid），预计比精细档更快`,
     `外壁速度 ${speed} mm/s，保留表面稳定性并避免极限速度波纹`,
-    `${baseText}，高/底宽比 ${metrics.heightToBaseRatio.toFixed(2)} → ${brim === "always" ? "加 5 mm brim" : "使用自动 brim"}`,
+    `${baseText}，高/底宽比 ${metrics.heightToBaseRatio.toFixed(2)} → ${brimReason}`,
     `悬垂专项：${overhangReason}；悬垂段降速 50/35/15 mm/s`,
   ];
   if (flatReason) speedReasons.push(`悬垂专项：${flatReason}`);
