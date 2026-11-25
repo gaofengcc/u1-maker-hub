@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { Instance, ModelDetail } from "@/lib/makerworld.ts";
 import type { Job } from "@/lib/jobs.ts";
@@ -292,7 +292,62 @@ export function ModelView({ design, site, settings, modes, defaults, filamentPre
           copies: 1,
           filamentToTool: s.filamentToTool,
         })}
-      />
+        />
+      <ArrangeCard instanceId={instance.id} designId={design.id} enabled={settings.loggedIn} />
     </main>
+  );
+}
+
+type ArrangeJob = {
+  id: string;
+  status: "pending" | "running" | "done" | "error";
+  progress: number;
+  error: string | null;
+  result: {
+    groups: { index: number; colors: string[]; plates: number; parts: number; gramsPerPlate: number[]; minutesPerPlate: number[] }[];
+    totalPlates: number;
+    originalPlates: number;
+    spoolChanges: number;
+    keptParts: number;
+    originalParts: number;
+  } | null;
+};
+
+function ArrangeCard({ instanceId, designId, enabled }: { instanceId: number; designId: number; enabled: boolean }) {
+  const [job, setJob] = useState<ArrangeJob | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  useEffect(() => {
+    if (!job || (job.status !== "pending" && job.status !== "running")) return;
+    const timer = setInterval(async () => {
+      try { setJob(await api<ArrangeJob>(`/api/arrange/${job.id}`)); } catch { /* 下一轮重试 */ }
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [job]);
+  async function start() {
+    setBusy(true); setError(null);
+    try { setJob(await api<ArrangeJob>("/api/arrange", { method: "POST", body: JSON.stringify({ instanceId, designId, mode: "palette" }) })); }
+    catch (err) { setError(err instanceof Error ? err.message : String(err)); }
+    finally { setBusy(false); }
+  }
+  const result = job?.result;
+  return (
+    <section className="panel" style={{ marginTop: 16 }}>
+      <h2>{t("model.arrangeTitle")}</h2>
+      <p className="small muted">{t("model.arrangeDescription")}</p>
+      {!job && <button type="button" className="btn" onClick={start} disabled={!enabled || busy}>{busy ? t("model.arrangeStarting") : t("model.arrangeStart")}</button>}
+      {!enabled && <p className="small muted">{t("model.downloadNeedsAccount")}</p>}
+      {job && (job.status === "pending" || job.status === "running") && <div aria-live="polite"><p className="small">{t("model.arrangeProgress", { percent: job.progress })}</p><progress value={job.progress} max={100} style={{ width: "100%" }} /></div>}
+      {job?.status === "error" && <div className="notice error">{job.error || t("model.arrangeFailed")}</div>}
+      {result && job?.status === "done" && (
+        <div style={{ overflowX: "auto" }}>
+          <p className="small">{t("model.arrangeSummary", { total: result.totalPlates, original: result.originalPlates, parts: result.keptParts })} {t("model.arrangeSpoolChanges", { count: result.spoolChanges })}</p>
+          <table><thead><tr><th>{t("model.arrangeGroup")}</th><th>{t("model.arrangeColors")}</th><th>{t("model.arrangePlates")}</th><th>{t("model.arrangeMaterial")}</th><th /></tr></thead><tbody>
+            {result.groups.map((group) => <tr key={group.index}><td>{group.index}</td><td>{group.colors.join("、")}</td><td>{group.plates}</td><td>{group.gramsPerPlate.map((grams, i) => `${Math.round(grams)}g / ${Math.round(group.minutesPerPlate[i] ?? 0)}min`).join(" · ")}</td><td><a className="btn small" href={`/api/arrange/${job.id}/file?group=${group.index}`}>{t("model.arrangeDownload")}</a></td></tr>)}
+          </tbody></table>
+        </div>
+      )}
+      {error && <div className="notice error">{error}</div>}
+    </section>
   );
 }
