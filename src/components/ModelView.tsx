@@ -332,7 +332,7 @@ function ArrangeCard({ instanceId, designId, enabled }: { instanceId: number; de
   }
   const result = job?.result;
   return (
-    <section className="panel mobile-sticky-actions" style={{ marginTop: 16 }}>
+    <section className="panel" style={{ marginTop: 16 }}>
       <h2>{t("model.arrangeTitle")}</h2>
       <p className="small muted">{t("model.arrangeDescription")}</p>
       {!job && <button type="button" className="btn" onClick={start} disabled={!enabled || busy}>{busy ? t("model.arrangeStarting") : t("model.arrangeStart")}</button>}
