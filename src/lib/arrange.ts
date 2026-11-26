@@ -9,7 +9,18 @@ const execFileAsync = promisify(execFile);
 
 /** 分组所需的耗材信息。slot 使用 1-based 编号，与 3MF 的 extruder 一致。 */
 export type ArrangeFilament = { color: string; type?: string; preset?: string };
-export type ArrangePart = { id?: string | number; slot: number; count?: number };
+export type ArrangePart = {
+  id?: string | number;
+  /** 对象级 extruder，兼容既有调用方。 */
+  slot: number;
+  /**
+   * 该对象实际用到的全部颜色槽：对象级 extruder ∪ 各 part 级 extruder。
+   * painted（多色）模型里一个对象可能同时含多种颜色，分组必须按整个集合判断，
+   * 否则某块区域会在重映射时落到别的颜色上。
+   */
+  slots: number[];
+  count?: number;
+};
 export type ArrangeProject = {
   filaments: ArrangeFilament[];
   parts: ArrangePart[];
@@ -45,11 +56,13 @@ function slotCount(project: ArrangeProject, slot: number) {
 }
 
 /**
- * 按材料类型隔离，再按零件数量降序把颜色放入当前零件数最少且未满的箱子。
- * 所有并列情况都使用槽号作为次级排序，结果不依赖时间、随机数或对象遍历顺序。
+ * 按材料类型隔离，再按「对象」装箱：每个对象携带自己的完整颜色集合，
+ * 只有并集仍 ≤4 色时才放进同一组。全流程确定性排序（颜色数 → 件数 → 槽号）。
  */
 export function groupByPalette(project: ArrangeProject): PaletteGroup[] {
-  const used = new Set(project.parts.map((part) => part.slot));
+  const used = new Set<number>();
+  for (const part of project.parts) for (const slot of part.slots) used.add(slot);
+
   const byMaterial = new Map<string, number[]>();
   for (const slot of [...used].sort((a, b) => a - b)) {
     const filament = project.filaments[slot - 1] ?? project.filaments[0] ?? { type: "PLA", color: "#FFFFFF" };
@@ -61,28 +74,41 @@ export function groupByPalette(project: ArrangeProject): PaletteGroup[] {
 
   const groups: PaletteGroup[] = [];
   for (const material of [...byMaterial.keys()].sort((a, b) => a.localeCompare(b))) {
-    const slots = byMaterial.get(material)!;
-    slots.sort((a, b) => slotCount(project, b) - slotCount(project, a) || a - b);
-    const bins: { slots: number[]; parts: number }[] = [];
-    for (const slot of slots) {
-      const target = bins
-        .filter((bin) => bin.slots.length < 4)
-        .sort((a, b) => a.parts - b.parts || a.slots[0] - b.slots[0])[0];
-      const count = slotCount(project, slot);
-      if (target) {
-        target.slots.push(slot);
-        target.parts += count;
-      } else {
-        bins.push({ slots: [slot], parts: count });
+    const materialSlots = new Set(byMaterial.get(material)!);
+    const objects = project.parts
+      .filter((part) => part.slots.some((slot) => materialSlots.has(slot)))
+      .map((part, order) => ({ part, order }));
+    objects.sort((a, b) => {
+      if (b.part.slots.length !== a.part.slots.length) return b.part.slots.length - a.part.slots.length;
+      const ca = a.part.count ?? 1;
+      const cb = b.part.count ?? 1;
+      if (cb !== ca) return cb - ca;
+      return a.order - b.order;
+    });
+
+    const bins: { slots: Set<number>; parts: number }[] = [];
+    for (const { part } of objects) {
+      const need = part.slots;
+      let target = bins.find((bin) => {
+        const union = new Set(bin.slots);
+        for (const slot of need) union.add(slot);
+        return union.size <= 4;
+      });
+      if (!target) {
+        target = { slots: new Set(), parts: 0 };
+        bins.push(target);
       }
+      for (const slot of need) target.slots.add(slot);
+      target.parts += part.count ?? 1;
     }
+
     for (const bin of bins) {
-      bin.slots.sort((a, b) => a - b);
+      const slots = [...bin.slots].sort((a, b) => a - b);
       groups.push({
         index: groups.length + 1,
         material,
-        slots: bin.slots,
-        colors: bin.slots.map((slot) => project.filaments[slot - 1]?.color ?? "#FFFFFF"),
+        slots,
+        colors: slots.map((slot) => project.filaments[slot - 1]?.color ?? "#FFFFFF"),
         parts: bin.parts,
       });
     }
@@ -94,27 +120,37 @@ export function groupByPalette(project: ArrangeProject): PaletteGroup[] {
 export async function readArrangeProject(file: string): Promise<ArrangeProject> {
   const zip = await JSZip.loadAsync(fs.readFileSync(file));
   const settings = parseJson((await zip.file("Metadata/project_settings.config")?.async("string")) ?? "{}");
-  const colors = asArray(settings.filament_colour);
-  const types = asArray(settings.filament_type);
-  const presets = asArray(settings.filament_settings_id);
+  const colors = asArray(settings.filament_colour).map((value) => String(value));
+  const types = asArray(settings.filament_type).map((value) => String(value));
+  const presets = asArray(settings.filament_settings_id).map((value) => String(value));
   const filaments = (colors.length ? colors : ["#FFFFFF"]).map((color, i) => ({
     color: normalizeColor(color),
     type: types[i] ?? types[0] ?? "PLA",
     preset: presets[i] ?? "",
   }));
   const modelSettings = (await zip.file("Metadata/model_settings.config")?.async("string")) ?? "";
-  const objectSlot = new Map<string, number>();
+
+  // 对象 → 完整颜色集合：对象级 extruder 加上每个 part 自己的 extruder。
+  const objectSlots = new Map<string, number[]>();
   for (const object of modelSettings.match(/<object\b[\s\S]*?<\/object>/g) ?? []) {
     const id = /<object\b[^>]*\bid="(\d+)"/.exec(object)?.[1];
-    const slot = Number(/<metadata\b[^>]*\bkey="extruder"[^>]*\bvalue="(\d+)"/.exec(object)?.[1]);
-    if (id && Number.isInteger(slot) && slot > 0) objectSlot.set(id, slot);
+    if (!id) continue;
+    const slots = new Set<number>();
+    for (const part of object.match(/<part\b[\s\S]*?<\/part>/g) ?? []) {
+      const slot = Number(/<metadata\b[^>]*\bkey="extruder"[^>]*\bvalue="(\d+)"/.exec(part)?.[1]);
+      if (Number.isInteger(slot) && slot > 0) slots.add(slot);
+    }
+    const own = Number(/<metadata\b[^>]*\bkey="extruder"[^>]*\bvalue="(\d+)"/.exec(object)?.[1]);
+    if (Number.isInteger(own) && own > 0) slots.add(own);
+    if (slots.size) objectSlots.set(id, [...slots].sort((a, b) => a - b));
   }
+
   const model = (await zip.file("3D/3dmodel.model")?.async("string")) ?? "";
   const parts: ArrangePart[] = [];
   for (const item of model.match(/<item\b[^>]*\/>/g) ?? []) {
     const id = /\bobjectid="(\d+)"/.exec(item)?.[1];
-    const slot = id ? objectSlot.get(id) : undefined;
-    if (slot) parts.push({ id, slot });
+    const slots = id ? objectSlots.get(id) : undefined;
+    if (slots && slots.length) parts.push({ id, slot: slots[0], slots });
   }
   return { filaments, parts };
 }
