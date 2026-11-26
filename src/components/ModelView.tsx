@@ -332,7 +332,7 @@ function ArrangeCard({ instanceId, designId, enabled }: { instanceId: number; de
   }
   const result = job?.result;
   return (
-    <section className="panel" style={{ marginTop: 16 }}>
+    <section className="panel mobile-sticky-actions" style={{ marginTop: 16 }}>
       <h2>{t("model.arrangeTitle")}</h2>
       <p className="small muted">{t("model.arrangeDescription")}</p>
       {!job && <button type="button" className="btn" onClick={start} disabled={!enabled || busy}>{busy ? t("model.arrangeStarting") : t("model.arrangeStart")}</button>}
@@ -342,8 +342,8 @@ function ArrangeCard({ instanceId, designId, enabled }: { instanceId: number; de
       {result && job?.status === "done" && (
         <div style={{ overflowX: "auto" }}>
           <p className="small">{t("model.arrangeSummary", { total: result.totalPlates, original: result.originalPlates, parts: result.keptParts })} {t("model.arrangeSpoolChanges", { count: result.spoolChanges })}</p>
-          <table><thead><tr><th>{t("model.arrangeGroup")}</th><th>{t("model.arrangeColors")}</th><th>{t("model.arrangePlates")}</th><th>{t("model.arrangeMaterial")}</th><th /></tr></thead><tbody>
-            {result.groups.map((group) => <tr key={group.index}><td>{group.index}</td><td>{group.colors.join("、")}</td><td>{group.plates}</td><td>{group.gramsPerPlate.map((grams, i) => `${Math.round(grams)}g / ${Math.round(group.minutesPerPlate[i] ?? 0)}min`).join(" · ")}</td><td><a className="btn small" href={`/api/arrange/${job.id}/file?group=${group.index}`}>{t("model.arrangeDownload")}</a></td></tr>)}
+          <table className="responsive-table"><thead><tr><th>{t("model.arrangeGroup")}</th><th>{t("model.arrangeColors")}</th><th>{t("model.arrangePlates")}</th><th>{t("model.arrangeMaterial")}</th><th /></tr></thead><tbody>
+            {result.groups.map((group) => <tr key={group.index}><td data-label={t("model.arrangeGroup")}>{group.index}</td><td data-label={t("model.arrangeColors")}>{group.colors.join("、")}</td><td data-label={t("model.arrangePlates")}>{group.plates}</td><td data-label={t("model.arrangeMaterial")}>{group.gramsPerPlate.map((grams, i) => `${Math.round(grams)}g / ${Math.round(group.minutesPerPlate[i] ?? 0)}min`).join(" · ")}</td><td data-label={t("model.arrangeDownload")}><a className="btn small" href={`/api/arrange/${job.id}/file?group=${group.index}`}>{t("model.arrangeDownload")}</a></td></tr>)}
           </tbody></table>
         </div>
       )}

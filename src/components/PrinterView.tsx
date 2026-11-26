@@ -187,7 +187,7 @@ export function PrinterView() {
               </p>
             ) : (
               <div className="table-wrap">
-                <table style={{ minWidth: 480 }}>
+                <table className="responsive-table" style={{ minWidth: 480 }}>
                   <thead>
                     <tr>
                       <th scope="col">{t("printer.model")}</th>
@@ -201,16 +201,16 @@ export function PrinterView() {
                   <tbody>
                     {jobs.map((j) => (
                       <tr key={j.id}>
-                        <td>
+                        <td data-label={t("printer.model")}>
                           <Link href={jobModelUrl(j)}>{j.title}</Link>
                         </td>
-                        <td className="muted">{duration(j.stats.seconds)}</td>
-                        <td>
+                        <td className="muted" data-label={t("printer.u1Time")}>{duration(j.stats.seconds)}</td>
+                        <td data-label={t("printer.result")}>
                           <span className={`badge ${j.status === "error" ? "red" : j.status === "done" ? "green" : ""}`}>
                             {j.status === "error" ? t("printer.failed") : j.status === "running" ? t("printer.working") : j.send ? t("printer.sent") : t("printer.sliced")}
                           </span>
                         </td>
-                        <td style={{ textAlign: "right" }}>
+                        <td data-label={t("printer.files")} style={{ textAlign: "right" }}>
                           {j.files.gcode.length > 0 && (
                             <a className="btn btn-sm" href={`/api/jobs/${j.id}/file?kind=gcode`}>
                               G-code
@@ -227,13 +227,13 @@ export function PrinterView() {
               <>
                 <h2 style={{ marginTop: 8 }}>{t("printer.printerHistory")}</h2>
                 <div className="table-wrap">
-                  <table style={{ minWidth: 420 }}>
+                  <table className="responsive-table" style={{ minWidth: 420 }}>
                     <tbody>
                       {s.history.map((h, i) => (
                         <tr key={i}>
-                          <td>{h.filename}</td>
-                          <td className="muted">{duration(h.print_duration)}</td>
-                          <td>
+                          <td data-label={t("printer.model")}>{h.filename}</td>
+                          <td className="muted" data-label={t("printer.u1Time")}>{duration(h.print_duration)}</td>
+                          <td data-label={t("printer.result")}>
                             <span className={`badge ${h.status === "completed" ? "green" : h.status === "cancelled" || h.status === "error" ? "red" : ""}`}>{historyStatusLabel(h.status)}</span>
                           </td>
                         </tr>

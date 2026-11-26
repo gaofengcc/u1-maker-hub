@@ -277,7 +277,7 @@ function AccountPanel({ s, onChange }: { s: PublicSettings; onChange: (s: Public
           <label className="label" htmlFor="tfa">
             {t("settings.authenticatorCode")}
           </label>
-          <div style={{ display: "flex", gap: 8 }}>
+          <div className="settings-inline" style={{ display: "flex", gap: 8 }}>
             <input id="tfa" className="input" inputMode="numeric" autoComplete="one-time-code" value={code} onChange={(e) => setCode(e.target.value)} />
             <button className="btn btn-primary" disabled={busy}>
               {t("settings.verify")}
@@ -295,7 +295,7 @@ function AccountPanel({ s, onChange }: { s: PublicSettings; onChange: (s: Public
           <label className="label" htmlFor="code">
             {t("settings.codeSent", { email })}
           </label>
-          <div style={{ display: "flex", gap: 8 }}>
+          <div className="settings-inline" style={{ display: "flex", gap: 8 }}>
             <input id="code" className="input" inputMode="numeric" autoComplete="one-time-code" value={code} onChange={(e) => setCode(e.target.value)} />
             <button className="btn btn-primary" disabled={busy}>
               {t("settings.login")}
@@ -338,7 +338,7 @@ function AccountPanel({ s, onChange }: { s: PublicSettings; onChange: (s: Public
           <label className="label" htmlFor="email2">
             {t("settings.codeEmailHint")}
           </label>
-          <div style={{ display: "flex", gap: 8 }}>
+          <div className="settings-inline" style={{ display: "flex", gap: 8 }}>
             <input id="email2" className="input" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
             <button className="btn btn-primary" disabled={busy}>
               {t("settings.sendCode")}

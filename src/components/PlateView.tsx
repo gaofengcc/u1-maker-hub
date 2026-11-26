@@ -275,7 +275,7 @@ export function PlateView({ settings, modes, defaults }: Props) {
             <PresetPicker modes={modes} value={mode} onChange={setMode} />
           </section>
 
-          <section className="panel" style={{ order: 5 }}>
+          <section className="panel mobile-sticky-actions" style={{ order: 5 }}>
             <button type="button" className="btn btn-primary btn-lg" disabled={busy || !fits || !settings.printerConfigured} onClick={() => start(true)}>
               <SendIcon size={20} /> {bedCount > 1 ? t("plate.slicePlatesAndPrint", { count: bedCount }) : t("plate.sliceAndPrint")}
             </button>

@@ -23,6 +23,8 @@
   --shadow: 0 6px 20px rgba(17, 24, 39, 0.1);
   --gutter: 16px;
   --tabbar-h: 60px;
+  --mobile-breakpoint: 640px;
+  --small-breakpoint: 420px;
 }
 
 /* Styles are mobile first: base rules target phones, min-width queries add the tablet and desktop layout.
@@ -45,6 +47,7 @@ body {
 body {
   /* Room for the bottom tab bar. */
   padding-bottom: calc(var(--tabbar-h) + env(safe-area-inset-bottom));
+  overflow-x: hidden;
 }
 a,
 button,
@@ -208,6 +211,7 @@ img {
 }
 .tabbar a {
   height: var(--tabbar-h);
+  min-width: 0;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -925,6 +929,62 @@ thead th {
   border-bottom-color: #e5e7eb;
 }
 
+/* Data tables become one readable card per row on narrow screens. The same
+   table markup remains in use so desktop layout and semantics are unchanged. */
+@media (max-width: 640px) {
+  .responsive-table {
+    display: block;
+    width: 100%;
+    min-width: 0 !important;
+    border-collapse: separate;
+    border-spacing: 0;
+  }
+  .responsive-table thead {
+    display: none;
+  }
+  .responsive-table tbody {
+    display: block;
+  }
+  .responsive-table tr {
+    display: block;
+    margin-bottom: 10px;
+    padding: 8px 12px;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    background: var(--surface);
+  }
+  .responsive-table tr:last-child {
+    margin-bottom: 0;
+  }
+  .responsive-table td {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+    min-width: 0;
+    padding: 6px 0;
+    border-bottom: 0;
+    text-align: right;
+    overflow-wrap: anywhere;
+  }
+  .responsive-table td::before {
+    content: attr(data-label);
+    flex: 0 0 42%;
+    color: var(--muted);
+    font-size: 13px;
+    font-weight: 600;
+    text-align: left;
+  }
+  .responsive-table td > * {
+    max-width: 58%;
+  }
+  .responsive-table td .btn,
+  .responsive-table td .select,
+  .responsive-table td .input {
+    max-width: 100%;
+  }
+}
+
 .preview-box {
   width: 100%;
   aspect-ratio: 4 / 3;
@@ -1307,6 +1367,169 @@ thead th {
   padding: 8px var(--gutter) 24px;
   font-size: 12px;
   color: var(--faint);
+}
+
+/* ---------- Compact mobile layout ---------- */
+@media (max-width: 640px) {
+  .container,
+  .container > *,
+  .container section > div,
+  .header-inner,
+  .panel,
+  .two-col,
+  .col-main,
+  .col-side {
+    min-width: 0;
+    max-width: 100%;
+  }
+  .input {
+    min-width: 0;
+  }
+
+  .header-inner {
+    gap: 8px;
+  }
+  .chips {
+    min-width: 0;
+    width: 100%;
+    margin-left: 0;
+    margin-right: 0;
+    padding-left: 0;
+    padding-right: 0;
+  }
+  .brand {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .brand > span {
+    flex: none;
+  }
+  .printer-pill {
+    max-width: 44px;
+    padding-right: 6px;
+  }
+  .printer-pill .pill-text {
+    display: none;
+  }
+  .nav a,
+  .tabbar a,
+  .btn,
+  .btn-sm,
+  .chip,
+  .profile,
+  .bed-tabs button,
+  .stepper,
+  .size-input {
+    min-height: 44px;
+  }
+  .btn-sm {
+    height: 44px;
+  }
+  .fav-icon {
+    width: 44px;
+    height: 44px;
+  }
+  .chip {
+    height: 44px;
+  }
+  .select-sm {
+    height: 44px;
+    font-size: 16px;
+  }
+  input[type="range"] {
+    height: 44px;
+  }
+  label:has(input[type="checkbox"]),
+  label:has(input[type="radio"]),
+  .check-list li {
+    min-height: 44px;
+  }
+  .stepper {
+    height: 44px;
+  }
+  .stepper button {
+    width: 44px;
+  }
+  .size-input {
+    height: 44px;
+  }
+
+  .grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+  }
+  .card-body {
+    padding: 8px;
+    gap: 6px;
+  }
+  .card-title {
+    font-size: 13px;
+    min-height: 34px;
+  }
+  .card-meta {
+    font-size: 12px;
+  }
+
+  .preview-box {
+    aspect-ratio: 1 / 1;
+  }
+  .toolpath-legend label {
+    min-height: 44px;
+  }
+  .thumbs {
+    grid-auto-columns: 48px;
+  }
+  .plate-thumb {
+    width: 48px;
+    height: 48px;
+  }
+
+  /* Responsive tables expose their field labels through data-label. */
+  .table-wrap {
+    overflow-x: visible;
+  }
+
+  .settings-inline {
+    flex-wrap: wrap;
+  }
+  .settings-inline .input {
+    flex: 1 1 180px;
+  }
+  .settings-inline .btn {
+    flex: 1 1 auto;
+  }
+
+  .mobile-sticky-actions {
+    position: sticky;
+    bottom: 0;
+    z-index: 35;
+    background: var(--surface);
+    margin-left: calc(-1 * var(--gutter));
+    margin-right: calc(-1 * var(--gutter));
+    padding: 12px var(--gutter) calc(12px + env(safe-area-inset-bottom));
+    border-radius: 12px 12px 0 0;
+    box-shadow: 0 -4px 16px rgba(17, 24, 39, 0.12);
+  }
+}
+
+@media (max-width: 420px) {
+  :root {
+    --gutter: 12px;
+  }
+  .header-inner {
+    padding-left: calc(var(--gutter) + env(safe-area-inset-left));
+    padding-right: calc(var(--gutter) + env(safe-area-inset-right));
+  }
+  .grid {
+    gap: 6px;
+  }
+  .card-body {
+    padding: 7px;
+  }
+  .card-title {
+    font-size: 12px;
+  }
 }
 
 /* ---------- Large phones and tablets ---------- */

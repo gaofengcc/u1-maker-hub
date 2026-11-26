@@ -363,7 +363,7 @@ export function PrintSetup(props: Props) {
           unavailableHint={props.mesh.unavailableHint}
         />
 
-        <section className="panel" style={{ order: 7 }}>
+        <section className="panel mobile-sticky-actions" style={{ order: 7 }}>
           {props.notice}
           <button type="button" className="btn btn-primary btn-lg" disabled={blocked || !settings.printerConfigured} onClick={() => start(true)}>
             <SendIcon size={20} /> {t("print.sliceAndSend")}
