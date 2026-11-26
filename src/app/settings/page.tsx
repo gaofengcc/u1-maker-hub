@@ -23,5 +23,5 @@ async function SettingsContent() {
   } catch {
     filaments = [];
   }
-  return <SettingsView initial={publicSettings()} filaments={filaments} />;
+  return <SettingsView initial={publicSettings()} filaments={filaments} demoMode={process.env.DEMO_MODE === "1"} />;
 }

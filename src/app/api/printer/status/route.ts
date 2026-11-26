@@ -5,6 +5,9 @@ import { observePrinterStatus } from "@/lib/history.ts";
 
 export async function GET(req: Request) {
   await connection();
+  if (process.env.DEMO_MODE === "1") {
+    return NextResponse.json({ online: false, configured: false, demo: true, error: "演示模式，未连接打印机" });
+  }
   if (!readSettings().printerHost) return NextResponse.json({ online: false, configured: false, error: "No printer address set." });
   const withHistory = new URL(req.url).searchParams.get("history") === "1";
   try {
