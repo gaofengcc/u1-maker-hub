@@ -1,6 +1,7 @@
 import { connection, NextResponse } from "next/server";
 import { getStatus, jobHistory, PrinterError } from "@/lib/printer.ts";
 import { readSettings } from "@/lib/store.ts";
+import { observePrinterStatus } from "@/lib/history.ts";
 
 export async function GET(req: Request) {
   await connection();
@@ -8,6 +9,7 @@ export async function GET(req: Request) {
   const withHistory = new URL(req.url).searchParams.get("history") === "1";
   try {
     const status = await getStatus();
+    observePrinterStatus(status);
     const history = withHistory ? await jobHistory(8).catch(() => []) : undefined;
     return NextResponse.json({ ...status, configured: true, history });
   } catch (err) {

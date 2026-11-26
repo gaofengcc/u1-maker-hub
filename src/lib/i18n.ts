@@ -1,6 +1,7 @@
 import base from "@/messages/zh-CN";
 import monitor from "@/messages/zh-CN.monitor";
 import misc from "@/messages/zh-CN.misc";
+import history from "@/messages/zh-CN.history";
 
 type Vars = Record<string, string | number>;
 type Dict = { [key: string]: string | readonly string[] | Dict };
@@ -24,7 +25,7 @@ function mergeDict(...parts: Dict[]): Dict {
   return out;
 }
 
-const zhCN: Dict = mergeDict(base as Dict, monitor as Dict, misc as Dict);
+const zhCN: Dict = mergeDict(base as Dict, monitor as Dict, misc as Dict, history as Dict);
 
 function lookup(key: string): unknown {
   return key.split(".").reduce<unknown>((value, part) => {

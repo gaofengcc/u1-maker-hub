@@ -6,6 +6,7 @@ const zhCN = {
     upload: "上传",
     printer: "我的打印机",
     settings: "设置",
+    history: "历史",
     mainNav: "主导航",
     checking: "检查中…",
     notSetUp: "未设置",
