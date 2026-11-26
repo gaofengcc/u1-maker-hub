@@ -209,6 +209,8 @@ export type SliceRequest = {
   /** Resize and rotate the plate as one piece. */
   transform?: PlateTransform;
   onLog?: (line: string) => void;
+  /** 后台精确切片的硬超时，默认沿用打印任务的 15 分钟保护。 */
+  timeoutMs?: number;
 };
 
 export type SliceResult = {
@@ -375,7 +377,7 @@ export async function sliceForU1(req: SliceRequest): Promise<SliceResult> {
     const probe = path.join(presetDir, "probe.stl");
     fs.writeFileSync(probe, cubeStl(10));
     const fullConfigPath = path.join(presetDir, "full_config.json");
-    await run(SLICER_BIN, [...presetArgs, "--export-settings", fullConfigPath, probe], req.workDir, onLog);
+    await run(SLICER_BIN, [...presetArgs, "--export-settings", fullConfigPath, probe], req.workDir, onLog, req.timeoutMs);
     const fullConfig = JSON.parse(fs.readFileSync(fullConfigPath, "utf8"));
     // Step 2: swap it into the project so no Bambu-only value survives.
     onLog("Replacing the Bambu settings inside the 3MF");
@@ -416,7 +418,7 @@ export async function sliceForU1(req: SliceRequest): Promise<SliceResult> {
     "--export-3mf", exportName,
     input,
   ];
-  await run(SLICER_BIN, args, req.workDir, onLog);
+  await run(SLICER_BIN, args, req.workDir, onLog, req.timeoutMs);
   const gcodeFiles = fs
     .readdirSync(outDir)
     .filter((f) => f.endsWith(".gcode"))
@@ -482,10 +484,11 @@ const CLI_ERRORS: Record<number, string> = {
 
 export class SlicerError extends Error {}
 
-function run(bin: string, args: string[], cwd: string, onLog?: (line: string) => void): Promise<string> {
+function run(bin: string, args: string[], cwd: string, onLog?: (line: string) => void, timeoutMs = 15 * 60 * 1000): Promise<string> {
   return new Promise((resolve, reject) => {
     const child = spawn(bin, args, { cwd });
     let output = "";
+    let timedOut = false;
     const collect = (chunk: Buffer) => {
       const text = chunk.toString();
       output += text;
@@ -493,7 +496,10 @@ function run(bin: string, args: string[], cwd: string, onLog?: (line: string) =>
     };
     child.stdout.on("data", collect);
     child.stderr.on("data", collect);
-    const timer = setTimeout(() => child.kill("SIGKILL"), 15 * 60 * 1000);
+    const timer = setTimeout(() => {
+      timedOut = true;
+      child.kill("SIGKILL");
+    }, timeoutMs);
     child.on("error", (err) => {
       clearTimeout(timer);
       reject(new SlicerError(`Could not start the slicer at ${bin}: ${err.message}`));
@@ -502,7 +508,9 @@ function run(bin: string, args: string[], cwd: string, onLog?: (line: string) =>
       clearTimeout(timer);
       if (code === 0) return resolve(output);
       const signed = code === null ? null : code > 127 ? code - 256 : code;
-      const reason = signal
+      const reason = timedOut
+        ? `切片超过 ${Math.round(timeoutMs / 1000)} 秒，已停止。`
+        : signal
         ? `The slicer crashed (${signal}).`
         : (signed !== null && CLI_ERRORS[signed]) || `The slicer stopped with code ${signed}.`;
       const detail = output.split("\n").filter((l) => /error|not in range|failed/i.test(l)).slice(-5).join("\n");

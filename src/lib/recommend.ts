@@ -11,6 +11,8 @@ export type PlateMetrics = {
   surfaceAreaMm2: number;
   overhang45Percent: number;
   overhang60Percent: number;
+  /** 对外口径：离地悬垂面积占全部表面积的比例。旧字段仅供内部诊断。 */
+  overhangPercent: number;
   /** 中腰水平朝下面（大平悬空/顶棚）的面积：这类面不靠降速、要靠桥接速度与支撑。 */
   flatOverhangMm2: number;
   bedContactAreaMm2: number;
@@ -66,7 +68,7 @@ export function metricsFromTriangles(triangles: Iterable<Triangle>): PlateMetric
   if (!triangleCount) {
     return {
       bbox: [0, 0, 0, 0, 0, 0], volumeMm3: 0, surfaceAreaMm2: 0,
-      overhang45Percent: 0, overhang60Percent: 0, flatOverhangMm2: 0, bedContactAreaMm2: 0,
+      overhang45Percent: 0, overhang60Percent: 0, overhangPercent: 0, flatOverhangMm2: 0, bedContactAreaMm2: 0,
       heightMm: 0, baseAreaMm2: 0, heightToBaseRatio: 0, thinFeatureScore: 0, triangleCount: 0,
     };
   }
@@ -75,6 +77,7 @@ export function metricsFromTriangles(triangles: Iterable<Triangle>): PlateMetric
   const tolerance = Math.max(0.05, heightMm * 0.001);
   let over45 = 0;
   let over60 = 0;
+  let overhang = 0;
   let flatOverhangMm2 = 0;
   let bedContactAreaMm2 = 0;
   for (const row of rows) {
@@ -89,7 +92,11 @@ export function metricsFromTriangles(triangles: Iterable<Triangle>): PlateMetric
     // 水平朝下面只有位于最低处才是贴床面，中腰的水平顶棚仍需支撑。
     const horizontalDown = row.nz < -0.999 && Math.abs(p[2] - p[5]) < 1e-6 && Math.abs(p[2] - p[8]) < 1e-6 && atBed;
     // 45° 边界面按“不计入”处理，留出微小数值误差容差。
-    if (!horizontalDown && row.nz < -Math.sin(Math.PI / 4) - 1e-12) over45 += row.area;
+    if (!horizontalDown && row.nz < -Math.sin(Math.PI / 4) - 1e-12) {
+      over45 += row.area;
+      // 离地口径排除任何接触最低平面的面，避免把床面边缘计入悬垂。
+      if (lowest > minZ + tolerance) overhang += row.area;
+    }
     if (!horizontalDown && row.nz < -Math.sin(Math.PI / 3) - 1e-12) over60 += row.area;
   }
   // A near-horizontal footprint may be split into several triangles, so the bottom
@@ -108,6 +115,7 @@ export function metricsFromTriangles(triangles: Iterable<Triangle>): PlateMetric
     surfaceAreaMm2: area,
     overhang45Percent: area ? (over45 / area) * 100 : 0,
     overhang60Percent: area ? (over60 / area) * 100 : 0,
+    overhangPercent: area ? (overhang / area) * 100 : 0,
     flatOverhangMm2,
     bedContactAreaMm2,
     heightMm,
@@ -175,7 +183,7 @@ function supportQuote(hints: ModelHints | undefined, mode: "forbidden" | "requir
 /** 按几何特征生成两套 U1 参数。所有原因都带有本次模型的实际数字，便于用户核对。 */
 export function recommendFromMetrics(metrics: PlateMetrics, model: RecommendationModel = {}): Recommendations {
   const hints = model.hints;
-  const overhang = metrics.overhang45Percent;
+  const overhang = metrics.overhangPercent;
   const severeOverhang = metrics.overhang60Percent;
   const tall = metrics.heightToBaseRatio >= 4 || (metrics.heightMm >= 100 && metrics.baseAreaMm2 > 0 && metrics.heightToBaseRatio >= 3);
   const geometryNeedsSupport = overhang >= 12;
@@ -198,8 +206,8 @@ export function recommendFromMetrics(metrics: PlateMetrics, model: Recommendatio
   const flatRoof = metrics.flatOverhangMm2;
   const bridgeSpeed = flatRoof >= 300 ? "35" : null;
   const overhangReason = needsSupport
-    ? `悬垂 ${overhang.toFixed(1)}%（>45°）、严重悬垂 ${severeOverhang.toFixed(1)}%（>60°）→ 开树状支撑，支撑角 ${supportAngle}°（宁可多支撑，防塌陷）`
-    : `悬垂 ${overhang.toFixed(1)}%（>45°）、严重悬垂 ${severeOverhang.toFixed(1)}%（>60°）、未达 12% → 不建支撑，只靠悬垂段降速`;
+    ? `悬垂 ${overhang.toFixed(1)}%（离地悬垂面积占比）→ 开树状支撑，支撑角 ${supportAngle}°（宁可多支撑，防塌陷）`
+    : `悬垂 ${overhang.toFixed(1)}%（离地悬垂面积占比）、未达 12% → 不建支撑，只靠悬垂段降速`;
   const speedPair = "40/25/10";
   const flatReason = flatRoof >= 1
     ? `平悬空 ${flatRoof.toFixed(0)} mm²（中腰水平朝下）${bridgeSpeed ? `→ 桥接速度降到 ${bridgeSpeed} mm/s（实测代价约 +7%）` : "（面积小，桥接速度保持默认）"}`
@@ -323,7 +331,7 @@ export type RoughEstimate = {
  */
 export function roughEstimate(metrics: PlateMetrics, options: PrintOptions, materialType = "PLA", filamentChanges = 0, layerHeight = 0.2): RoughEstimate {
   const shell = metrics.surfaceAreaMm2 * Math.max(1, options.wallLoops) * 0.42 * 0.7;
-  const support = options.supports === "off" ? 0 : metrics.volumeMm3 * (metrics.overhang45Percent / 100) * 0.15;
+  const support = options.supports === "off" ? 0 : metrics.volumeMm3 * (metrics.overhangPercent / 100) * 0.15;
   const infill = metrics.volumeMm3 * Math.max(0, Math.min(100, options.infillDensity)) / 100;
   const materialVolumeMm3 = shell + infill + support;
   const density = MATERIAL_DENSITY[materialType.toUpperCase()] ?? MATERIAL_DENSITY.PLA;

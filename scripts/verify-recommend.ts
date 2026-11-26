@@ -14,7 +14,7 @@ function cube(size: number): Triangle[] {
 function metricWithOverhang(overhang45Percent: number, overhang60Percent = 0): Parameters<typeof recommendFromMetrics>[0] {
   return {
     bbox: [0, 0, 0, 20, 20, 20], volumeMm3: 8000, surfaceAreaMm2: 2400,
-    overhang45Percent, overhang60Percent, flatOverhangMm2: 0, bedContactAreaMm2: 400, heightMm: 20,
+    overhang45Percent, overhang60Percent, overhangPercent: overhang45Percent, flatOverhangMm2: 0, bedContactAreaMm2: 400, heightMm: 20,
     baseAreaMm2: 400, heightToBaseRatio: 1, thinFeatureScore: 0, triangleCount: 12,
   };
 }
